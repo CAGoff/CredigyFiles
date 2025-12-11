@@ -1,0 +1,9 @@
+{
+  "name": "credigy-files-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {}
+}

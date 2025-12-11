@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Go build
+bin/
+obj/
+*.exe
+
+# Azure Functions local settings
+local.settings.json
+.funcignore
+
+# Node/npm (for web)
+node_modules/
+*.log
+dist/
+build/
+
+# Logs / temp
+*.tmp
+*.swp
+*.swo
+
+# Deployment artifacts
+*.zip
