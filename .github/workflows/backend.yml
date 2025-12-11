@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  FUNCTION_APP_NAME: credigy-files-api   # update to your Function App name
+  FUNCTION_APP_NAME: func-credigyfiles-api-prod   # update if renamed
 
 jobs:
   build-and-deploy:
@@ -20,19 +20,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          go-version: '1.21.x'
-          cache-dependency-path: api/go.sum
+          node-version: '18'
 
-      - name: Test
+      - name: Install dependencies
         working-directory: api
-        run: go test ./...
-
-      - name: Build custom handler (linux)
-        working-directory: api
-        run: GOOS=linux GOARCH=amd64 go build -o handler
+        run: npm install --no-fund --no-audit
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
