@@ -21,7 +21,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1>Secure File Transfer</h1>
+      <h1>Credigy Files</h1>
       <h2>Third-Party Containers</h2>
       {containers.length === 0 ? (
         <p>No containers available.</p>

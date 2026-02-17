@@ -2,8 +2,8 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #1a1a2e;
-  background-color: #f5f6fa;
+  color: #e4e4e7;
+  background-color: #0f0f13;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -32,20 +32,23 @@ h1 {
   font-size: 1.75rem;
   font-weight: 600;
   margin: 0 0 1rem;
+  color: #f4f4f5;
 }
 
 h2 {
   font-size: 1.25rem;
   font-weight: 600;
   margin: 1.5rem 0 0.75rem;
+  color: #d4d4d8;
 }
 
 a {
-  color: #0066cc;
+  color: #60a5fa;
   text-decoration: none;
 }
 
 a:hover {
+  color: #93bbfd;
   text-decoration: underline;
 }
 
@@ -56,13 +59,13 @@ button,
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #3f3f46;
   padding: 0.5em 1em;
   font-size: 0.875rem;
   font-weight: 500;
   font-family: inherit;
-  background-color: #fff;
-  color: #374151;
+  background-color: #27272a;
+  color: #d4d4d8;
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s;
   text-decoration: none;
@@ -71,25 +74,25 @@ button,
 
 button:hover,
 .btn:hover {
-  background-color: #f3f4f6;
-  border-color: #9ca3af;
+  background-color: #3f3f46;
+  border-color: #52525b;
   text-decoration: none;
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .btn-primary {
-  background-color: #0066cc;
-  border-color: #0066cc;
+  background-color: #2563eb;
+  border-color: #2563eb;
   color: #fff;
 }
 
 .btn-primary:hover {
-  background-color: #0052a3;
-  border-color: #0052a3;
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .btn-danger {
@@ -107,14 +110,14 @@ button:disabled {
 table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: #18181b;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #27272a;
 }
 
 thead {
-  background-color: #f8f9fa;
+  background-color: #1e1e23;
 }
 
 th {
@@ -124,18 +127,19 @@ th {
   font-size: 0.8125rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: #6b7280;
-  border-bottom: 2px solid #e5e7eb;
+  color: #a1a1aa;
+  border-bottom: 2px solid #27272a;
 }
 
 td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #27272a;
   font-size: 0.875rem;
+  color: #d4d4d8;
 }
 
 tbody tr:hover {
-  background-color: #f8fafc;
+  background-color: #1e1e24;
 }
 
 tbody tr:last-child td {
@@ -157,7 +161,7 @@ td.actions {
   font-weight: 500;
   font-size: 0.875rem;
   margin-bottom: 0.375rem;
-  color: #374151;
+  color: #a1a1aa;
 }
 
 .form-group input[type="text"],
@@ -171,10 +175,10 @@ td.actions {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   font-family: inherit;
-  border: 1px solid #d1d5db;
+  border: 1px solid #3f3f46;
   border-radius: 6px;
-  background: #fff;
-  color: #1a1a2e;
+  background: #1e1e23;
+  color: #e4e4e7;
   transition: border-color 0.15s;
 }
 
@@ -182,8 +186,8 @@ td.actions {
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #0066cc;
-  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
 }
 
 .form-group input[type="checkbox"] {
@@ -203,27 +207,27 @@ td.actions {
 
 .status-active,
 .status-Active {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
 }
 
 .status-provisioning,
 .status-Provisioning {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
 }
 
 .status-error,
 .status-Error {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
 }
 
 /* Error message */
 .error {
-  color: #dc2626;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
+  color: #f87171;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
   border-radius: 6px;
   padding: 0.75rem 1rem;
   font-size: 0.875rem;

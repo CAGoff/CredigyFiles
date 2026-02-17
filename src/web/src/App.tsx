@@ -56,7 +56,7 @@ function App() {
         </AuthenticatedTemplate>
         <UnauthenticatedTemplate>
           <div className="login-prompt">
-            <h1>Secure File Transfer</h1>
+            <h1>Credigy Files</h1>
             <p>Please log in to access the file transfer portal.</p>
             <button className="btn btn-primary" onClick={handleLogin}>Login with Microsoft</button>
           </div>
