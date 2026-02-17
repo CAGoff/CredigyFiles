@@ -10,9 +10,11 @@ import FileBrowser from "./pages/FileBrowser";
 import Upload from "./pages/Upload";
 import ActivityLog from "./pages/ActivityLog";
 import AdminOnboarding from "./pages/AdminOnboarding";
+import "./App.css";
 
 function App() {
-  const { instance } = useMsal();
+  const { instance, accounts } = useMsal();
+  const userName = accounts[0]?.name ?? accounts[0]?.username;
 
   const handleLogin = () => {
     instance.loginRedirect(loginRequest);
@@ -23,23 +25,25 @@ function App() {
   };
 
   return (
-    <div>
-      <nav>
-        <Link to="/">Dashboard</Link>
-        {" | "}
-        <Link to="/activity">Activity</Link>
-        {" | "}
-        <Link to="/admin">Admin</Link>
-        {" | "}
-        <AuthenticatedTemplate>
-          <button onClick={handleLogout}>Logout</button>
-        </AuthenticatedTemplate>
-        <UnauthenticatedTemplate>
-          <button onClick={handleLogin}>Login</button>
-        </UnauthenticatedTemplate>
+    <div className="app">
+      <nav className="navbar">
+        <div className="nav-links">
+          <Link to="/">Dashboard</Link>
+          <Link to="/activity">Activity</Link>
+          <Link to="/admin">Admin</Link>
+        </div>
+        <div className="nav-auth">
+          <AuthenticatedTemplate>
+            {userName && <span className="nav-user">{userName}</span>}
+            <button onClick={handleLogout}>Logout</button>
+          </AuthenticatedTemplate>
+          <UnauthenticatedTemplate>
+            <button onClick={handleLogin}>Login</button>
+          </UnauthenticatedTemplate>
+        </div>
       </nav>
 
-      <main>
+      <main className="content">
         <AuthenticatedTemplate>
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -51,9 +55,11 @@ function App() {
           </Routes>
         </AuthenticatedTemplate>
         <UnauthenticatedTemplate>
-          <h1>Secure File Transfer</h1>
-          <p>Please log in to access the file transfer portal.</p>
-          <button onClick={handleLogin}>Login with Microsoft</button>
+          <div className="login-prompt">
+            <h1>Secure File Transfer</h1>
+            <p>Please log in to access the file transfer portal.</p>
+            <button className="btn btn-primary" onClick={handleLogin}>Login with Microsoft</button>
+          </div>
         </UnauthenticatedTemplate>
       </main>
     </div>

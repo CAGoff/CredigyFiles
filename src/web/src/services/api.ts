@@ -1,17 +1,38 @@
 import type { IPublicClientApplication } from "@azure/msal-browser";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { apiScopes } from "./auth";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://localhost:5001/v1";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/v1";
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
 
 async function getToken(msalInstance: IPublicClientApplication, scopes: string[]): Promise<string> {
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length === 0) throw new Error("No authenticated account found");
 
-  const response = await msalInstance.acquireTokenSilent({
-    scopes,
-    account: accounts[0],
-  });
-  return response.accessToken;
+  try {
+    const response = await msalInstance.acquireTokenSilent({
+      scopes,
+      account: accounts[0],
+    });
+    return response.accessToken;
+  } catch (err) {
+    if (err instanceof InteractionRequiredAuthError) {
+      await msalInstance.acquireTokenRedirect({ scopes });
+      throw new Error("Redirecting to login...");
+    }
+    throw err;
+  }
 }
 
 async function apiFetch(
@@ -28,6 +49,22 @@ async function apiFetch(
       Authorization: `Bearer ${token}`,
     },
   });
+
+  if (!response.ok) {
+    let code = "UNKNOWN";
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const body = await response.json();
+      if (body?.error) {
+        code = body.error.code ?? code;
+        message = body.error.message ?? message;
+      }
+    } catch {
+      // Response body wasn't JSON — use defaults
+    }
+    throw new ApiError(response.status, code, message);
+  }
+
   return response;
 }
 

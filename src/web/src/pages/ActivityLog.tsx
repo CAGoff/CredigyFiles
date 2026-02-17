@@ -17,6 +17,7 @@ export default function ActivityLog() {
   const { instance } = useMsal();
   const [records, setRecords] = useState<ActivityRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchActivity = containerName
@@ -25,13 +26,14 @@ export default function ActivityLog() {
 
     fetchActivity
       .then((data) => setRecords(data.activity ?? []))
-      .catch(console.error)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load activity"))
       .finally(() => setLoading(false));
   }, [instance, containerName]);
 
   return (
     <div>
       <h1>Activity Log{containerName ? `: ${containerName}` : " (All)"}</h1>
+      {error && <p className="error">{error}</p>}
       {loading ? (
         <p>Loading...</p>
       ) : records.length === 0 ? (

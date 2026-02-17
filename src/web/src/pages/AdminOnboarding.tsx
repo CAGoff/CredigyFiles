@@ -14,34 +14,35 @@ export default function AdminOnboarding() {
   const { instance } = useMsal();
   const [parties, setParties] = useState<ThirdPartyInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [enableAutomation, setEnableAutomation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  const fetchParties = () => {
-    setLoading(true);
-    listThirdParties(instance)
-      .then((data) => setParties(data.thirdParties ?? []))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  };
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchParties();
+    listThirdParties(instance)
+      .then((data) => setParties(data.thirdParties ?? []))
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load third parties"))
+      .finally(() => setLoading(false));
   }, [instance]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await createThirdParty(instance, { companyName, contactEmail, enableAutomation });
       setCompanyName("");
       setContactEmail("");
       setEnableAutomation(false);
-      fetchParties();
+      setLoading(true);
+      const data = await listThirdParties(instance);
+      setParties(data.thirdParties ?? []);
+      setLoading(false);
     } catch (err) {
-      console.error(err);
+      setSubmitError(err instanceof Error ? err.message : "Provisioning failed");
     } finally {
       setSubmitting(false);
     }
@@ -53,26 +54,28 @@ export default function AdminOnboarding() {
 
       <h2>Register New Third Party</h2>
       <form onSubmit={handleCreate}>
-        <div>
-          <label>Company Name: </label>
-          <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
+        <div className="form-group">
+          <label htmlFor="companyName">Company Name</label>
+          <input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
         </div>
-        <div>
-          <label>Contact Email: </label>
-          <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} required />
+        <div className="form-group">
+          <label htmlFor="contactEmail">Contact Email</label>
+          <input id="contactEmail" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} required />
         </div>
-        <div>
+        <div className="form-group">
           <label>
             <input type="checkbox" checked={enableAutomation} onChange={(e) => setEnableAutomation(e.target.checked)} />
-            Enable Automation (App Registration + Certificate)
+            {" "}Enable Automation (App Registration + Certificate)
           </label>
         </div>
-        <button type="submit" disabled={submitting}>
+        {submitError && <p className="error">{submitError}</p>}
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? "Provisioning..." : "Provision Third Party"}
         </button>
       </form>
 
       <h2>Registered Third Parties</h2>
+      {error && <p className="error">{error}</p>}
       {loading ? (
         <p>Loading...</p>
       ) : parties.length === 0 ? (
@@ -92,7 +95,7 @@ export default function AdminOnboarding() {
               <tr key={p.id}>
                 <td>{p.companyName}</td>
                 <td>{p.containerName}</td>
-                <td>{p.status}</td>
+                <td><span className={`status status-${p.status}`}>{p.status}</span></td>
                 <td>{new Date(p.createdAt).toLocaleString()}</td>
               </tr>
             ))}
