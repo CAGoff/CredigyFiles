@@ -1,7 +1,7 @@
 // =============================================================================
 // Module: appservice.bicep
 // Description: App Service Plan (B1 Linux) and Web App for the SFT API.
-//              Assigns the API user-assigned managed identity and configures
+//              VNet integrated, with user-assigned managed identity and
 //              app settings for storage and Azure AD authentication.
 // =============================================================================
 
@@ -23,20 +23,24 @@ param apiIdentityClientId string
 @description('Blob endpoint URI of the app storage account.')
 param appStorageBlobUri string
 
-@description('Resource ID of the Application Insights instance.')
-param appInsightsInstrumentationKey string
-
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
 
 @description('APIM outbound IP address for IP restriction. Use APIM gateway IP or service tag.')
 param apimOutboundIp string = ''
 
+@description('Resource ID of the subnet for VNet integration.')
+param subnetId string
+
+@description('Tags applied to all resources.')
+param tags object
+
 var baseName = 'sft-${projectName}-${environment}'
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${baseName}-plan'
   location: location
+  tags: tags
   kind: 'linux'
   sku: {
     name: 'B1'
@@ -50,6 +54,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: '${baseName}-api'
   location: location
+  tags: tags
   kind: 'app,linux'
   identity: {
     type: 'UserAssigned'
@@ -60,6 +65,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
+    virtualNetworkSubnetId: subnetId
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|9.0'
       alwaysOn: true
@@ -92,7 +98,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'AzureAd__Instance'
-          value: 'https://login.microsoftonline.com/'
+          value: '${az.environment().authentication.loginEndpoint}/'
         }
         {
           name: 'AzureAd__TenantId'
@@ -105,10 +111,6 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'AzureAd__Audience'
           value: 'PLACEHOLDER_API_AUDIENCE'
-        }
-        {
-          name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
-          value: appInsightsInstrumentationKey
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'

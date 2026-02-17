@@ -13,11 +13,15 @@ param projectName string
 @description('Deployment environment (dev, staging, prod).')
 param environment string
 
+@description('Tags applied to all resources.')
+param tags object
+
 var baseName = 'sft-${projectName}-${environment}'
 
 resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   name: '${baseName}-spa'
   location: location
+  tags: tags
   sku: {
     name: 'Free'
     tier: 'Free'

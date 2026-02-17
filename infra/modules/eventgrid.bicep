@@ -20,14 +20,15 @@ param storageAccountId string
 @description('Resource ID of the notification Function App.')
 param functionAppId string
 
-@description('Name of the notification Function App.')
-param functionAppName string
+@description('Tags applied to all resources.')
+param tags object
 
 var baseName = 'sft-${projectName}-${environment}'
 
 resource systemTopic 'Microsoft.EventGrid/systemTopics@2023-12-15-preview' = {
   name: '${baseName}-evgt'
   location: location
+  tags: tags
   properties: {
     source: storageAccountId
     topicType: 'Microsoft.Storage.StorageAccounts'

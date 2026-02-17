@@ -14,21 +14,27 @@ param projectName string
 @description('Deployment environment (dev, staging, prod).')
 param environment string
 
+@description('Tags applied to all resources.')
+param tags object
+
 var baseName = 'sft-${projectName}-${environment}'
 
 resource identityApi 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${baseName}-id-sft-api'
+  name: '${baseName}-id-api'
   location: location
+  tags: tags
 }
 
 resource identityFuncNotify 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${baseName}-id-sft-func-notify'
+  name: '${baseName}-id-func-notify'
   location: location
+  tags: tags
 }
 
 resource identityFuncProvision 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${baseName}-id-sft-func-provision'
+  name: '${baseName}-id-func-provision'
   location: location
+  tags: tags
 }
 
 @description('Resource ID of the API managed identity.')

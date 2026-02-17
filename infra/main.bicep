@@ -6,9 +6,9 @@
 //
 // Usage:
 //   az deployment group create \
-//     --resource-group <rg-name> \
+//     --resource-group rg-credigyfiles-dev-eus \
 //     --template-file main.bicep \
-//     --parameters projectName=<name> environment=<env>
+//     --parameters projectName=credigyfiles environment=dev
 // =============================================================================
 
 targetScope = 'resourceGroup'
@@ -22,7 +22,7 @@ param location string = resourceGroup().location
 
 @description('Short project name used in resource naming (lowercase, no special chars).')
 @minLength(2)
-@maxLength(10)
+@maxLength(13)
 param projectName string
 
 @description('Deployment environment (dev, staging, prod).')
@@ -42,17 +42,60 @@ param apimPublisherName string = 'Secure File Transfer'
 @description('APIM outbound IP address for App Service IP restriction. Leave empty to skip IP restrictions (useful for initial deployment before APIM exists).')
 param apimOutboundIp string = ''
 
+@description('Resource group containing the shared VNet.')
+param vnetResourceGroup string = 'rg-network-dev-eus'
+
+@description('Name of the shared VNet for VNet integration.')
+param vnetName string = 'vnet-webapp-dev-eus'
+
+@description('Name of the existing subnet for App Service VNet integration.')
+param appServiceSubnetName string = 'sn-credigyfiles-outbound-dev-172_23_17_192-28'
+
+@description('Name of the existing subnet for Function App VNet integration (must be delegated to Microsoft.App/environments).')
+param functionAppSubnetName string = 'sn-credigyfiles-func-outbound-dev-172_23_17_208-28'
+
+@description('Resource group where the Log Analytics Workspace should be created.')
+param lawResourceGroup string = 'rg-security-dev-eus'
+
+@description('Required tags applied to all resources.')
+param tags object = {
+  Environment: 'Development'
+  Project: 'CredigyFiles'
+  Owner: 'christopher.goff@credigy.com'
+}
+
+// ---------------------------------------------------------------------------
+// Cross-resource-group references
+// ---------------------------------------------------------------------------
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroup)
+}
+
+resource appServiceSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
+  parent: vnet
+  name: appServiceSubnetName
+}
+
+resource functionAppSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
+  parent: vnet
+  name: functionAppSubnetName
+}
+
 // ---------------------------------------------------------------------------
 // Modules
 // ---------------------------------------------------------------------------
 
-// 1. Monitoring (no dependencies — deployed first so other modules can reference it)
+// 1. Monitoring — LAW deploys to rg-security-dev-eus, App Insights stays in this RG
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
   params: {
     location: location
     projectName: projectName
     environment: environment
+    lawResourceGroup: lawResourceGroup
+    tags: tags
   }
 }
 
@@ -63,6 +106,7 @@ module identity 'modules/identity.bicep' = {
     location: location
     projectName: projectName
     environment: environment
+    tags: tags
   }
 }
 
@@ -73,6 +117,7 @@ module storageApp 'modules/storage-app.bicep' = {
     location: location
     projectName: projectName
     environment: environment
+    tags: tags
   }
 }
 
@@ -83,6 +128,7 @@ module storageFunc 'modules/storage-func.bicep' = {
     location: location
     projectName: projectName
     environment: environment
+    tags: tags
   }
 }
 
@@ -93,6 +139,7 @@ module staticWebApp 'modules/staticwebapp.bicep' = {
     location: location
     projectName: projectName
     environment: environment
+    tags: tags
   }
 }
 
@@ -102,6 +149,7 @@ module communication 'modules/communication.bicep' = {
   params: {
     projectName: projectName
     environment: environment
+    tags: tags
   }
 }
 
@@ -115,9 +163,10 @@ module appService 'modules/appservice.bicep' = {
     apiIdentityId: identity.outputs.apiIdentityId
     apiIdentityClientId: identity.outputs.apiIdentityClientId
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
-    appInsightsInstrumentationKey: monitoring.outputs.appInsightsInstrumentationKey
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     apimOutboundIp: apimOutboundIp
+    subnetId: appServiceSubnet.id
+    tags: tags
   }
 }
 
@@ -132,11 +181,16 @@ module functions 'modules/functions.bicep' = {
     notifyIdentityClientId: identity.outputs.notifyIdentityClientId
     provisionIdentityId: identity.outputs.provisionIdentityId
     provisionIdentityClientId: identity.outputs.provisionIdentityClientId
-    funcStorageConnectionString: storageFunc.outputs.storageConnectionString
+    funcStorageAccountName: storageFunc.outputs.storageAccountName
+    funcStorageBlobUri: storageFunc.outputs.blobEndpointUri
+    funcStorageQueueUri: storageFunc.outputs.queueEndpointUri
+    funcStorageTableUri: storageFunc.outputs.tableEndpointUri
+    funcDeployContainerName: storageFunc.outputs.deployContainerName
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
-    appInsightsInstrumentationKey: monitoring.outputs.appInsightsInstrumentationKey
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     portalUrl: 'https://${staticWebApp.outputs.staticWebAppHostname}'
+    subnetId: functionAppSubnet.id
+    tags: tags
   }
 }
 
@@ -150,6 +204,7 @@ module apim 'modules/apim.bicep' = {
     publisherEmail: apimPublisherEmail
     publisherName: apimPublisherName
     backendWebAppHostname: appService.outputs.webAppHostname
+    tags: tags
   }
 }
 
@@ -162,7 +217,7 @@ module eventGrid 'modules/eventgrid.bicep' = {
     environment: environment
     storageAccountId: storageApp.outputs.storageAccountId
     functionAppId: functions.outputs.functionAppId
-    functionAppName: functions.outputs.functionAppName
+    tags: tags
   }
 }
 
@@ -202,9 +257,6 @@ output staticWebAppHostname string = staticWebApp.outputs.staticWebAppHostname
 
 @description('APIM gateway URL.')
 output apimGatewayUrl string = apim.outputs.apimGatewayUrl
-
-@description('Application Insights instrumentation key.')
-output appInsightsInstrumentationKey string = monitoring.outputs.appInsightsInstrumentationKey
 
 @description('Application Insights connection string.')
 output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString

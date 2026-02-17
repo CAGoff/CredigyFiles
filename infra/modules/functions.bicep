@@ -1,8 +1,8 @@
 // =============================================================================
 // Module: functions.bicep
-// Description: Consumption App Service Plan and Function App for the SFT
-//              notification and provisioning functions. Both user-assigned
-//              managed identities are assigned to the Function App.
+// Description: Flex Consumption (FC1) Function App for the SFT notification and
+//              provisioning functions. VNet integrated, with user-assigned
+//              managed identities and managed-identity-based storage access.
 // =============================================================================
 
 @description('Azure region for the Function App resources.')
@@ -26,14 +26,23 @@ param provisionIdentityId string
 @description('Client ID of the provisioning function managed identity.')
 param provisionIdentityClientId string
 
-@description('Connection string for the functions runtime storage account.')
-param funcStorageConnectionString string
+@description('Name of the functions runtime storage account.')
+param funcStorageAccountName string
+
+@description('Blob endpoint URI of the functions runtime storage account.')
+param funcStorageBlobUri string
+
+@description('Queue endpoint URI of the functions runtime storage account.')
+param funcStorageQueueUri string
+
+@description('Table endpoint URI of the functions runtime storage account.')
+param funcStorageTableUri string
+
+@description('Name of the deployment blob container in func storage.')
+param funcDeployContainerName string
 
 @description('Blob endpoint URI of the app storage account.')
 param appStorageBlobUri string
-
-@description('Resource ID of the Application Insights instance.')
-param appInsightsInstrumentationKey string
 
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
@@ -41,15 +50,22 @@ param appInsightsConnectionString string
 @description('URL of the SPA portal for notification emails.')
 param portalUrl string
 
+@description('Resource ID of the subnet for VNet integration.')
+param subnetId string
+
+@description('Tags applied to all resources.')
+param tags object
+
 var baseName = 'sft-${projectName}-${environment}'
 
 resource functionPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${baseName}-func-plan'
   location: location
+  tags: tags
   kind: 'functionapp'
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'FC1'
+    tier: 'FlexConsumption'
   }
   properties: {
     reserved: true
@@ -59,6 +75,7 @@ resource functionPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
 resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: '${baseName}-func'
   location: location
+  tags: tags
   kind: 'functionapp,linux'
   identity: {
     type: 'UserAssigned'
@@ -70,22 +87,49 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: functionPlan.id
     httpsOnly: true
+    virtualNetworkSubnetId: subnetId
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${funcStorageBlobUri}${funcDeployContainerName}'
+          authentication: {
+            type: 'SystemAssignedIdentity'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: 40
+        instanceMemoryMB: 2048
+      }
+      runtime: {
+        name: 'dotnet-isolated'
+        version: '9.0'
+      }
+    }
     siteConfig: {
-      linuxFxVersion: 'DOTNET-ISOLATED|9.0'
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
       appSettings: [
         {
-          name: 'AzureWebJobsStorage'
-          value: funcStorageConnectionString
+          name: 'AzureWebJobsStorage__accountName'
+          value: funcStorageAccountName
         }
         {
-          name: 'FUNCTIONS_EXTENSION_VERSION'
-          value: '~4'
+          name: 'AzureWebJobsStorage__credential'
+          value: 'managedidentity'
         }
         {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'dotnet-isolated'
+          name: 'AzureWebJobsStorage__blobServiceUri'
+          value: funcStorageBlobUri
+        }
+        {
+          name: 'AzureWebJobsStorage__queueServiceUri'
+          value: funcStorageQueueUri
+        }
+        {
+          name: 'AzureWebJobsStorage__tableServiceUri'
+          value: funcStorageTableUri
         }
         {
           name: 'AppStorageUri'
@@ -110,10 +154,6 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'PortalUrl'
           value: portalUrl
-        }
-        {
-          name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
-          value: appInsightsInstrumentationKey
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'

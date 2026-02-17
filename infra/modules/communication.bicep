@@ -10,12 +10,16 @@ param projectName string
 @description('Deployment environment (dev, staging, prod).')
 param environment string
 
+@description('Tags applied to all resources.')
+param tags object
+
 var baseName = 'sft-${projectName}-${environment}'
 
 // ACS is a global resource; location is always 'global'.
 resource communicationService 'Microsoft.Communication/communicationServices@2023-04-01' = {
   name: '${baseName}-acs'
   location: 'global'
+  tags: tags
   properties: {
     dataLocation: 'United States'
   }

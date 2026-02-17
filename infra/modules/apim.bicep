@@ -22,11 +22,15 @@ param publisherName string = 'Secure File Transfer'
 @description('Default hostname of the backend Web App.')
 param backendWebAppHostname string
 
+@description('Tags applied to all resources.')
+param tags object
+
 var baseName = 'sft-${projectName}-${environment}'
 
 resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
   name: '${baseName}-apim'
   location: location
+  tags: tags
   sku: {
     name: 'Consumption'
     capacity: 0

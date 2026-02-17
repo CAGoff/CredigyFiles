@@ -1,7 +1,7 @@
 // =============================================================================
 // Module: monitoring.bicep
-// Description: Log Analytics Workspace and Application Insights for
-//              centralized monitoring of the Secure File Transfer project.
+// Description: Log Analytics Workspace (deployed to shared security RG) and
+//              Application Insights (in project RG) for centralized monitoring.
 // =============================================================================
 
 @description('Azure region for the monitoring resources.')
@@ -13,26 +13,34 @@ param projectName string
 @description('Deployment environment (dev, staging, prod).')
 param environment string
 
+@description('Resource group where the Log Analytics Workspace should be created.')
+param lawResourceGroup string
+
+@description('Tags applied to all resources.')
+param tags object
+
 var baseName = 'sft-${projectName}-${environment}'
 
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: '${baseName}-law'
-  location: location
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: 30
+// LAW is deployed to the shared security resource group via a nested module
+module law 'monitoring-law.bicep' = {
+  name: 'monitoring-law'
+  scope: resourceGroup(lawResourceGroup)
+  params: {
+    location: location
+    baseName: baseName
+    tags: tags
   }
 }
 
+// App Insights stays in the project resource group, linked to the cross-RG LAW
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: '${baseName}-ai'
   location: location
   kind: 'web'
+  tags: tags
   properties: {
     Application_Type: 'web'
-    WorkspaceResourceId: logAnalyticsWorkspace.id
+    WorkspaceResourceId: law.outputs.logAnalyticsWorkspaceId
     IngestionMode: 'LogAnalytics'
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
@@ -40,13 +48,10 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
 }
 
 @description('Resource ID of the Log Analytics Workspace.')
-output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
+output logAnalyticsWorkspaceId string = law.outputs.logAnalyticsWorkspaceId
 
 @description('Resource ID of the Application Insights instance.')
 output appInsightsId string = appInsights.id
-
-@description('Instrumentation key of Application Insights.')
-output appInsightsInstrumentationKey string = appInsights.properties.InstrumentationKey
 
 @description('Connection string of Application Insights.')
 output appInsightsConnectionString string = appInsights.properties.ConnectionString

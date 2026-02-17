@@ -13,12 +13,16 @@ param projectName string
 @description('Deployment environment (dev, staging, prod).')
 param environment string
 
+@description('Tags applied to all resources.')
+param tags object
+
 // Storage account names must be 3-24 chars, lowercase alphanumeric only.
 var storageAccountName = replace('sft${projectName}${environment}app', '-', '')
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name = length(storageAccountName) > 24 ? substring(storageAccountName, 0, 24) : storageAccountName
+  name: length(storageAccountName) > 24 ? substring(storageAccountName, 0, 24) : storageAccountName
   location: location
+  tags: tags
   kind: 'StorageV2'
   sku: {
     name: 'Standard_LRS'
