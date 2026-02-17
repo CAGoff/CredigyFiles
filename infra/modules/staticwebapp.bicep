@@ -4,8 +4,10 @@
 //              of the Secure File Transfer project.
 // =============================================================================
 
-@description('Azure region for the Static Web App.')
-param location string
+// Static Web Apps are not available in all regions. eastus2 is the closest
+// supported region to eastus. Content is served from edge nodes globally.
+@description('Azure region for the Static Web App (must be a supported SWA region).')
+param location string = 'eastus2'
 
 @description('Short project name used in resource naming.')
 param projectName string

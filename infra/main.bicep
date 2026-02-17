@@ -132,11 +132,10 @@ module storageFunc 'modules/storage-func.bicep' = {
   }
 }
 
-// 5. Static Web App (no dependencies)
+// 5. Static Web App (no dependencies — uses its own region, SWA not available in eastus)
 module staticWebApp 'modules/staticwebapp.bicep' = {
   name: 'staticWebApp'
   params: {
-    location: location
     projectName: projectName
     environment: environment
     tags: tags
