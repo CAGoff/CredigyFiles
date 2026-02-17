@@ -9,6 +9,11 @@ using SecureFileTransfer.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load optional local overrides (gitignored)
+builder.Configuration.AddJsonFile(
+    $"appsettings.{builder.Environment.EnvironmentName}.local.json",
+    optional: true, reloadOnChange: true);
+
 // Authentication — Layer 2 (independent JWT validation)
 if (builder.Configuration.GetValue<bool>("Authentication:UseDevelopmentAuth"))
 {
@@ -49,8 +54,11 @@ builder.Services.AddScoped<IOnboardingService, OnboardingService>();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-// Application Insights
-builder.Services.AddApplicationInsightsTelemetry();
+// Application Insights (skip in dev — requires connection string)
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.AddApplicationInsightsTelemetry();
+}
 
 // CORS
 builder.Services.AddCors(options =>
@@ -71,7 +79,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors("SpaPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
