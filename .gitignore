@@ -1,0 +1,44 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.dll
+*.pdb
+*.cache
+project.lock.json
+TestResults/
+
+# Node / Web
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Azure Functions
+.azurefunctions/
+local.settings.json
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.pfx
+*.key
+.env
+.env.*
+appsettings.Development.json
