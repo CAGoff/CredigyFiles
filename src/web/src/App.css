@@ -48,6 +48,16 @@
   color: #71717a;
 }
 
+.nav-dev-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.15em 0.5em;
+  border-radius: 4px;
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  letter-spacing: 0.05em;
+}
+
 /* Main content */
 .content {
   flex: 1;

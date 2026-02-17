@@ -12,9 +12,24 @@ import ActivityLog from "./pages/ActivityLog";
 import AdminOnboarding from "./pages/AdminOnboarding";
 import "./App.css";
 
+const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === "true";
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/files/:containerName" element={<FileBrowser />} />
+      <Route path="/upload/:containerName" element={<Upload />} />
+      <Route path="/activity" element={<ActivityLog />} />
+      <Route path="/activity/:containerName" element={<ActivityLog />} />
+      <Route path="/admin" element={<AdminOnboarding />} />
+    </Routes>
+  );
+}
+
 function App() {
   const { instance, accounts } = useMsal();
-  const userName = accounts[0]?.name ?? accounts[0]?.username;
+  const userName = DEV_AUTH ? "dev@localhost" : (accounts[0]?.name ?? accounts[0]?.username);
 
   const handleLogin = () => {
     instance.loginRedirect(loginRequest);
@@ -33,34 +48,42 @@ function App() {
           <Link to="/admin">Admin</Link>
         </div>
         <div className="nav-auth">
-          <AuthenticatedTemplate>
-            {userName && <span className="nav-user">{userName}</span>}
-            <button onClick={handleLogout}>Logout</button>
-          </AuthenticatedTemplate>
-          <UnauthenticatedTemplate>
-            <button onClick={handleLogin}>Login</button>
-          </UnauthenticatedTemplate>
+          {DEV_AUTH ? (
+            <>
+              <span className="nav-user">{userName}</span>
+              <span className="nav-dev-badge">DEV</span>
+            </>
+          ) : (
+            <>
+              <AuthenticatedTemplate>
+                {userName && <span className="nav-user">{userName}</span>}
+                <button onClick={handleLogout}>Logout</button>
+              </AuthenticatedTemplate>
+              <UnauthenticatedTemplate>
+                <button onClick={handleLogin}>Login</button>
+              </UnauthenticatedTemplate>
+            </>
+          )}
         </div>
       </nav>
 
       <main className="content">
-        <AuthenticatedTemplate>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/files/:containerName" element={<FileBrowser />} />
-            <Route path="/upload/:containerName" element={<Upload />} />
-            <Route path="/activity" element={<ActivityLog />} />
-            <Route path="/activity/:containerName" element={<ActivityLog />} />
-            <Route path="/admin" element={<AdminOnboarding />} />
-          </Routes>
-        </AuthenticatedTemplate>
-        <UnauthenticatedTemplate>
-          <div className="login-prompt">
-            <h1>Credigy Files</h1>
-            <p>Please log in to access the file transfer portal.</p>
-            <button className="btn btn-primary" onClick={handleLogin}>Login with Microsoft</button>
-          </div>
-        </UnauthenticatedTemplate>
+        {DEV_AUTH ? (
+          <AppRoutes />
+        ) : (
+          <>
+            <AuthenticatedTemplate>
+              <AppRoutes />
+            </AuthenticatedTemplate>
+            <UnauthenticatedTemplate>
+              <div className="login-prompt">
+                <h1>Credigy Files</h1>
+                <p>Please log in to access the file transfer portal.</p>
+                <button className="btn btn-primary" onClick={handleLogin}>Login with Microsoft</button>
+              </div>
+            </UnauthenticatedTemplate>
+          </>
+        )}
       </main>
     </div>
   );

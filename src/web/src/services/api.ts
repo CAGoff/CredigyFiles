@@ -3,6 +3,7 @@ import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { apiScopes } from "./auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/v1";
+const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === "true";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -41,13 +42,14 @@ async function apiFetch(
   options: RequestInit = {},
   scopes?: string[]
 ): Promise<Response> {
-  const token = await getToken(msalInstance, scopes ?? apiScopes.files);
+  const headers: Record<string, string> = { ...options.headers as Record<string, string> };
+  if (!DEV_AUTH) {
+    const token = await getToken(msalInstance, scopes ?? apiScopes.files);
+    headers.Authorization = `Bearer ${token}`;
+  }
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      ...options.headers,
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
   });
 
   if (!response.ok) {
