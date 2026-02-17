@@ -50,7 +50,7 @@ public class ActivityService : IActivityService
 
         var records = new List<ActivityRecord>();
         await foreach (var record in tableClient.QueryAsync<ActivityRecord>(
-            filter: $"PartitionKey eq '{containerName}'",
+            filter: $"PartitionKey eq '{ODataSanitizer.EscapeStringValue(containerName)}'",
             maxPerPage: take))
         {
             records.Add(record);
@@ -80,7 +80,7 @@ public class ActivityService : IActivityService
         await tableClient.CreateIfNotExistsAsync();
 
         await foreach (var entity in tableClient.QueryAsync<ThirdParty>(
-            filter: $"PartitionKey eq 'ThirdParty' and ContainerName eq '{containerName}'"))
+            filter: $"PartitionKey eq 'ThirdParty' and ContainerName eq '{ODataSanitizer.EscapeStringValue(containerName)}'"))
         {
             if (entity.Status != "active") return false;
 

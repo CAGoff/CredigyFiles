@@ -32,7 +32,7 @@ public class FilesController : ControllerBase
 
     /// <summary>List files (Hot tier only) in a container directory.</summary>
     [HttpGet]
-    public async Task<IActionResult> ListFiles(string containerName, [FromQuery] string dir)
+    public async Task<IActionResult> ListFiles(string containerName, [FromQuery] string dir, [FromQuery] int top = 100)
     {
         if (!FileValidationService.IsValidDirectory(dir))
             return BadRequest(new { error = new { code = "INVALID_DIRECTORY", message = "dir must be 'inbound' or 'outbound'." } });
@@ -40,7 +40,7 @@ public class FilesController : ControllerBase
         if (!await HttpContext.HasContainerAccessAsync(_activityService, containerName, _logger))
             return Forbid();
 
-        var files = await _blobStorage.ListFilesAsync(containerName, dir);
+        var files = await _blobStorage.ListFilesAsync(containerName, dir, top);
         return Ok(new FileListResponse(containerName, dir, files));
     }
 
@@ -59,6 +59,8 @@ public class FilesController : ControllerBase
             return BadRequest(new { error = new { code = "INVALID_FILENAME", message = "Invalid file name." } });
 
         var stream = await _blobStorage.DownloadFileAsync(containerName, dir, sanitized);
+        if (stream is null)
+            return NotFound(new { error = new { code = "FILE_NOT_FOUND", message = $"File '{sanitized}' not found." } });
 
         var correlationId = HttpContext.Items["CorrelationId"]?.ToString() ?? "";
         var userId = HttpContext.User.FindFirst("preferred_username")?.Value ?? "unknown";
@@ -108,7 +110,7 @@ public class FilesController : ControllerBase
 
             return Created($"v1/containers/{containerName}/files/{sanitized}?dir={dir}", result);
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+        catch (FileAlreadyExistsException ex)
         {
             return Conflict(new { error = new { code = "FILE_EXISTS", message = ex.Message } });
         }

@@ -83,15 +83,17 @@ public partial class OnboardingService : IOnboardingService
         }
     }
 
-    public async Task<IReadOnlyList<ThirdParty>> ListThirdPartiesAsync()
+    public async Task<IReadOnlyList<ThirdParty>> ListThirdPartiesAsync(int take = 100)
     {
         var tableClient = _tableServiceClient.GetTableClient(RegistryTable);
         await tableClient.CreateIfNotExistsAsync();
 
         var parties = new List<ThirdParty>();
-        await foreach (var entity in tableClient.QueryAsync<ThirdParty>(filter: "PartitionKey eq 'ThirdParty'"))
+        await foreach (var entity in tableClient.QueryAsync<ThirdParty>(
+            filter: "PartitionKey eq 'ThirdParty'", maxPerPage: take))
         {
             parties.Add(entity);
+            if (parties.Count >= take) break;
         }
         return parties;
     }

@@ -21,21 +21,21 @@ public class ActivityController : ControllerBase
 
     /// <summary>Get activity log for a specific container.</summary>
     [HttpGet("containers/{containerName}/activity")]
-    public async Task<IActionResult> GetContainerActivity(string containerName)
+    public async Task<IActionResult> GetContainerActivity(string containerName, [FromQuery] int top = 50)
     {
         if (!await HttpContext.HasContainerAccessAsync(_activityService, containerName, _logger))
             return Forbid();
 
-        var records = await _activityService.GetActivityAsync(containerName);
+        var records = await _activityService.GetActivityAsync(containerName, top);
         return Ok(new { container = containerName, activity = records });
     }
 
     /// <summary>Get activity log across all containers (admin only).</summary>
     [HttpGet("activity")]
     [Authorize(Roles = "SFT.Admin")]
-    public async Task<IActionResult> GetAllActivity()
+    public async Task<IActionResult> GetAllActivity([FromQuery] int top = 100)
     {
-        var records = await _activityService.GetAllActivityAsync();
+        var records = await _activityService.GetAllActivityAsync(top);
         return Ok(new { activity = records });
     }
 }

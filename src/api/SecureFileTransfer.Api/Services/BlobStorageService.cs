@@ -1,3 +1,4 @@
+using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using SecureFileTransfer.Api.Models;
@@ -25,7 +26,7 @@ public class BlobStorageService : IBlobStorageService
         return containers;
     }
 
-    public async Task<IReadOnlyList<TransferFile>> ListFilesAsync(string containerName, string directory)
+    public async Task<IReadOnlyList<TransferFile>> ListFilesAsync(string containerName, string directory, int take = 100)
     {
         var client = _blobServiceClient.GetBlobContainerClient(containerName);
         var files = new List<TransferFile>();
@@ -42,6 +43,8 @@ public class BlobStorageService : IBlobStorageService
                     SizeBytes: blob.Properties.ContentLength ?? 0,
                     UploadedAt: blob.Properties.LastModified ?? DateTimeOffset.MinValue,
                     AccessTier: blob.Properties.AccessTier?.ToString() ?? "Hot"));
+
+                if (files.Count >= take) break;
             }
         }
         return files;
@@ -58,7 +61,7 @@ public class BlobStorageService : IBlobStorageService
         // Reject if blob already exists (prevent silent overwrites)
         if (await blobClient.ExistsAsync())
         {
-            throw new InvalidOperationException($"File '{fileName}' already exists in {containerName}/{directory}.");
+            throw new FileAlreadyExistsException(fileName, containerName, directory);
         }
 
         var response = await blobClient.UploadAsync(content, new BlobUploadOptions
@@ -83,12 +86,20 @@ public class BlobStorageService : IBlobStorageService
             SizeBytes: properties.Value.ContentLength);
     }
 
-    public async Task<Stream> DownloadFileAsync(string containerName, string directory, string fileName)
+    public async Task<Stream?> DownloadFileAsync(string containerName, string directory, string fileName)
     {
         var client = _blobServiceClient.GetBlobContainerClient(containerName);
         var blobClient = client.GetBlobClient($"{directory}/{fileName}");
-        var download = await blobClient.DownloadStreamingAsync();
-        return download.Value.Content;
+
+        try
+        {
+            var download = await blobClient.DownloadStreamingAsync();
+            return download.Value.Content;
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
     }
 
     public async Task DeleteFileAsync(string containerName, string directory, string fileName)

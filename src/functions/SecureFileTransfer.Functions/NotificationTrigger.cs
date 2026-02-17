@@ -49,7 +49,7 @@ public class NotificationTrigger
         string? contactEmail = null;
 
         await foreach (var entity in registryTable.QueryAsync<TableEntity>(
-            filter: $"PartitionKey eq 'ThirdParty' and ContainerName eq '{containerName}'"))
+            filter: $"PartitionKey eq 'ThirdParty' and ContainerName eq '{ODataSanitizer.EscapeStringValue(containerName)}'"))
         {
             contactEmail = entity.GetString("ContactEmail");
             break;
@@ -61,14 +61,24 @@ public class NotificationTrigger
             return;
         }
 
-        // Send minimal notification email
+        // Send minimal notification email — all settings are required
         var acsConnectionString = Environment.GetEnvironmentVariable("AcsConnectionString");
-        var senderAddress = Environment.GetEnvironmentVariable("AcsSenderAddress") ?? "donotreply@yourdomain.com";
-        var portalUrl = Environment.GetEnvironmentVariable("PortalUrl") ?? "https://your-app.azurestaticapps.net";
+        var senderAddress = Environment.GetEnvironmentVariable("AcsSenderAddress");
+        var portalUrl = Environment.GetEnvironmentVariable("PortalUrl");
 
         if (string.IsNullOrEmpty(acsConnectionString))
         {
-            _logger.LogWarning("ACS connection string not configured. Skipping email notification.");
+            _logger.LogWarning("AcsConnectionString not configured. Skipping email notification.");
+            return;
+        }
+        if (string.IsNullOrEmpty(senderAddress))
+        {
+            _logger.LogWarning("AcsSenderAddress not configured. Skipping email notification.");
+            return;
+        }
+        if (string.IsNullOrEmpty(portalUrl))
+        {
+            _logger.LogWarning("PortalUrl not configured. Skipping email notification.");
             return;
         }
 

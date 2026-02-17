@@ -3,6 +3,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
+using SecureFileTransfer.Api.Models;
 using SecureFileTransfer.Api.Services;
 
 namespace SecureFileTransfer.Api.Tests.Services;
@@ -34,14 +35,15 @@ public class BlobStorageServiceTests
     }
 
     [Fact]
-    public async Task UploadFileAsync_ExistingBlob_ThrowsInvalidOperation()
+    public async Task UploadFileAsync_ExistingBlob_ThrowsFileAlreadyExists()
     {
         _mockBlobClient
             .Setup(x => x.ExistsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Response.FromValue(true, Mock.Of<Response>()));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        var ex = await Assert.ThrowsAsync<FileAlreadyExistsException>(
             () => _service.UploadFileAsync("sft-acme", "inbound", "existing.pdf", Stream.Null, "user@test.com"));
+        Assert.Equal("existing.pdf", ex.FileName);
     }
 
     [Fact]
@@ -84,6 +86,20 @@ public class BlobStorageServiceTests
             DeleteSnapshotsOption.IncludeSnapshots,
             It.IsAny<BlobRequestConditions>(),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DownloadFileAsync_BlobNotFound_ReturnsNull()
+    {
+        _mockBlobClient
+            .Setup(x => x.DownloadStreamingAsync(
+                It.IsAny<BlobDownloadOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RequestFailedException(404, "BlobNotFound"));
+
+        var result = await _service.DownloadFileAsync("sft-acme", "inbound", "missing.pdf");
+
+        Assert.Null(result);
     }
 
     [Fact]

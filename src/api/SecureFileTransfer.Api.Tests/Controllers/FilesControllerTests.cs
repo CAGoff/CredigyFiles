@@ -69,10 +69,10 @@ public class FilesControllerTests
         {
             new("report.pdf", "sft-acme", "inbound", 1024, DateTimeOffset.UtcNow, "Hot")
         };
-        _mockBlobStorage.Setup(x => x.ListFilesAsync("sft-acme", "inbound")).ReturnsAsync(files);
+        _mockBlobStorage.Setup(x => x.ListFilesAsync("sft-acme", "inbound", It.IsAny<int>())).ReturnsAsync(files);
 
         var controller = CreateController("admin-oid", "SFT.Admin");
-        var result = await controller.ListFiles("sft-acme", "inbound");
+        var result = await controller.ListFiles("sft-acme", "inbound", 100);
 
         Assert.IsType<OkObjectResult>(result);
     }
@@ -148,7 +148,7 @@ public class FilesControllerTests
         SetupAccessGranted();
         _mockBlobStorage
             .Setup(x => x.UploadFileAsync("sft-acme", "inbound", "report.pdf", It.IsAny<Stream>(), It.IsAny<string>()))
-            .ThrowsAsync(new InvalidOperationException("File 'report.pdf' already exists in sft-acme/inbound."));
+            .ThrowsAsync(new FileAlreadyExistsException("report.pdf", "sft-acme", "inbound"));
 
         var controller = CreateController("admin-oid", "SFT.Admin");
         var file = CreateMockFile("report.pdf", PdfContent());
@@ -195,6 +195,35 @@ public class FilesControllerTests
         var result = await controller.DownloadFile("sft-acme", "...", "inbound");
 
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task DownloadFile_BlobNotFound_ReturnsNotFound()
+    {
+        SetupAccessGranted();
+        _mockBlobStorage
+            .Setup(x => x.DownloadFileAsync("sft-acme", "inbound", "missing.pdf"))
+            .ReturnsAsync((Stream?)null);
+
+        var controller = CreateController("admin-oid", "SFT.Admin");
+        var result = await controller.DownloadFile("sft-acme", "missing.pdf", "inbound");
+
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task DownloadFile_ValidFile_ReturnsFileResult()
+    {
+        SetupAccessGranted();
+        var content = new MemoryStream(new byte[] { 1, 2, 3 });
+        _mockBlobStorage
+            .Setup(x => x.DownloadFileAsync("sft-acme", "inbound", "report.pdf"))
+            .ReturnsAsync(content);
+
+        var controller = CreateController("admin-oid", "SFT.Admin");
+        var result = await controller.DownloadFile("sft-acme", "report.pdf", "inbound");
+
+        Assert.IsType<FileStreamResult>(result);
     }
 
     // --- DeleteFile ---

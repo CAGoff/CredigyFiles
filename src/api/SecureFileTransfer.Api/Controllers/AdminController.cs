@@ -21,9 +21,9 @@ public class AdminController : ControllerBase
 
     /// <summary>List all registered third parties.</summary>
     [HttpGet]
-    public async Task<IActionResult> ListThirdParties()
+    public async Task<IActionResult> ListThirdParties([FromQuery] int top = 100)
     {
-        var parties = await _onboarding.ListThirdPartiesAsync();
+        var parties = await _onboarding.ListThirdPartiesAsync(top);
         return Ok(new { thirdParties = parties.Select(p => ToResponse(p)) });
     }
 
