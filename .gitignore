@@ -24,6 +24,12 @@ pnpm-debug.log*
 .azurefunctions/
 local.settings.json
 
+# Bicep compiled output
+infra/**/*.json
+
+# Deploy script build artifacts
+.publish/
+
 # IDE
 .vs/
 .vscode/
@@ -41,4 +47,5 @@ Thumbs.db
 *.key
 .env
 .env.*
+!.env.development
 appsettings.*.local.json

@@ -1,0 +1,171 @@
+name: CD
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ── Parallel build jobs ──────────────────────────────────────────────
+  build-api:
+    name: Build API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish
+        run: >
+          dotnet publish src/api/SecureFileTransfer.Api/SecureFileTransfer.Api.csproj
+          --configuration Release
+          --output ./publish/api
+
+      - name: Zip package
+        run: cd publish/api && zip -r ../../api-package.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-package
+          path: api-package.zip
+
+  build-functions:
+    name: Build Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish
+        run: >
+          dotnet publish src/functions/SecureFileTransfer.Functions/SecureFileTransfer.Functions.csproj
+          --configuration Release
+          --output ./publish/functions
+
+      - name: Zip package
+        run: cd publish/functions && zip -r ../../functions-package.zip .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: functions-package
+          path: functions-package.zip
+
+  build-web:
+    name: Build Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_AAD_CLIENT_ID: ${{ vars.VITE_AAD_CLIENT_ID }}
+          VITE_AAD_TENANT_ID: ${{ vars.VITE_AAD_TENANT_ID }}
+          VITE_AAD_API_CLIENT_ID: ${{ vars.VITE_AAD_API_CLIENT_ID }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: src/web/dist
+
+  # ── Sequential deploy job ────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [build-api, build-functions, build-web]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            infra
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # 1. Deploy API via Kudu zipdeploy
+      - name: Deploy API
+        run: |
+          az webapp deploy \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-api \
+            --src-path artifacts/api-package/api-package.zip \
+            --type zip \
+            --clean true
+
+      # 2. Deploy Functions (Flex Consumption)
+      - name: Deploy Functions
+        uses: Azure/functions-action@v2
+        with:
+          app-name: sft-credigyfiles-dev-func
+          package: artifacts/functions-package/functions-package.zip
+
+      # 3. Deploy SPA to Static Web App
+      - name: Deploy SPA
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          action: upload
+          app_location: artifacts/web-dist
+          skip_app_build: true
+          skip_api_build: true
+
+      # 4. Re-sync Event Grid subscription
+      - name: Update Event Grid subscription
+        continue-on-error: true
+        run: |
+          FUNC_ID=$(az functionapp show \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-func \
+            --query id --output tsv)
+
+          az eventgrid system-topic event-subscription create \
+            --resource-group rg-credigyfiles-dev-eus \
+            --system-topic-name sft-credigyfiles-dev-evgt \
+            --name sft-credigyfiles-dev-evgs-notify \
+            --endpoint-type azurefunction \
+            --endpoint "$FUNC_ID/functions/NotificationTrigger" \
+            --included-event-types Microsoft.Storage.BlobCreated Microsoft.Storage.BlobDeleted \
+            --max-delivery-attempts 30 \
+            --event-ttl 1440

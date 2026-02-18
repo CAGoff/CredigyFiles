@@ -2,8 +2,12 @@ import type { IPublicClientApplication } from "@azure/msal-browser";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { apiScopes } from "./auth";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/v1";
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === "true";
+
+if (!API_BASE) {
+  throw new Error("Missing required environment variable: VITE_API_BASE_URL");
+}
 
 export class ApiError extends Error {
   readonly status: number;
