@@ -141,11 +141,11 @@ jobs:
           app-name: sft-credigyfiles-dev-func
           package: artifacts/functions-package/functions-package.zip
 
-      # 3. Deploy SPA to Static Web App
+      # 3. Deploy SPA to Static Web App (uses OIDC via azure/login above)
       - name: Deploy SPA
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          azure_static_web_apps_api_token: ""
           action: upload
           app_location: artifacts/web-dist
           skip_app_build: true
