@@ -70,6 +70,7 @@ jobs:
   build-web:
     name: Build Web
     runs-on: ubuntu-latest
+    environment: dev
     defaults:
       run:
         working-directory: src/web
