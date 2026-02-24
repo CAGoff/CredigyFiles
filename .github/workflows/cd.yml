@@ -148,7 +148,7 @@ jobs:
         run: |
           TOKEN=$(az staticwebapp secrets list \
             --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-swa \
+            --name sft-credigyfiles-dev-spa \
             --query "properties.apiKey" --output tsv)
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
