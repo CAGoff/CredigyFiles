@@ -137,7 +137,7 @@ jobs:
 
       # 2. Deploy Functions (Flex Consumption)
       - name: Deploy Functions
-        uses: Azure/functions-action@v2
+        uses: Azure/functions-action@v1
         with:
           app-name: sft-credigyfiles-dev-func
           package: artifacts/functions-package/functions-package.zip

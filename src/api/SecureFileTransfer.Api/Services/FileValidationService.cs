@@ -22,8 +22,8 @@ public static partial class FileValidationService
     {
         if (string.IsNullOrWhiteSpace(fileName)) return null;
 
-        // Strip path components
-        var name = Path.GetFileName(fileName);
+        // Strip path components (normalize backslashes for cross-platform)
+        var name = Path.GetFileName(fileName.Replace('\\', '/'));
         if (string.IsNullOrWhiteSpace(name)) return null;
 
         // Remove characters that aren't alphanumeric, dash, underscore, or dot
