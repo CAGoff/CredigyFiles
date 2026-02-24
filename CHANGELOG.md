@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 ### Added
+- RBAC module (`modules/rbac.bicep`) for managed identity → storage role assignments
 - Initial project scaffold
 - Local development support: Azurite connection string + DevAuthHandler for JWT bypass
 - Quality gate script (`verify.ps1`) with dotnet build + test
@@ -20,6 +21,10 @@
 - Deployment container in func storage for Flex Consumption package deployment
 
 ### Changed
+- Bicep: Function App identity changed to `SystemAssigned, UserAssigned` for deployment storage auth
+- Bicep: Event Grid module is now conditional (`deployEventGrid` param, default false)
+- Bicep: Entra ID placeholders parameterized in App Service (`aadTenantId`, `aadApiClientId`, `aadApiAudience`)
+- Bicep: LAW deploys in project RG (removed cross-RG dependency on rg-security-dev-eus)
 - React SPA: Vite dev proxy (`/v1` → `localhost:5292`) for local API calls
 - React SPA: `ApiError` class with structured error handling on all pages
 - React SPA: MSAL `InteractionRequiredAuthError` triggers interactive token refresh
@@ -37,6 +42,9 @@
 - Bicep: MSAL auth placeholders use GUID format for Entra ID values
 
 ### Fixed
+- CI: cross-platform filename sanitization (backslash handling for Linux)
+- CD: `azure/functions-action` changed from `@v2` (nonexistent) to `@v1`
+- Bicep: RBAC — added Queue/Table/AccountContributor roles for Function App system identity on func storage
 - Download endpoint returns 404 instead of 500 when blob not found
 - OData filter injection risk in ActivityService and NotificationTrigger
 - NotificationTrigger no longer falls back to placeholder sender/portal URLs
