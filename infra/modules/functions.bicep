@@ -78,7 +78,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   tags: tags
   kind: 'functionapp,linux'
   identity: {
-    type: 'UserAssigned'
+    type: 'SystemAssigned, UserAssigned'
     userAssignedIdentities: {
       '${notifyIdentityId}': {}
       '${provisionIdentityId}': {}
@@ -172,3 +172,6 @@ output functionAppHostname string = functionApp.properties.defaultHostName
 
 @description('Name of the Function App.')
 output functionAppName string = functionApp.name
+
+@description('Principal ID of the Function App system-assigned identity.')
+output functionAppSystemPrincipalId string = functionApp.identity.principalId

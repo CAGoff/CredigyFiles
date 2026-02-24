@@ -54,8 +54,17 @@ param appServiceSubnetName string = 'sn-credigyfiles-outbound-dev-172_23_17_192-
 @description('Name of the existing subnet for Function App VNet integration (must be delegated to Microsoft.App/environments).')
 param functionAppSubnetName string = 'sn-credigyfiles-func-outbound-dev-172_23_17_208-28'
 
-@description('Resource group where the Log Analytics Workspace should be created.')
-param lawResourceGroup string = 'rg-security-dev-eus'
+@description('Azure AD tenant ID for JWT validation. Update after creating Entra ID app registrations.')
+param aadTenantId string = '00000000-0000-0000-0000-000000000000'
+
+@description('Azure AD client ID of the API app registration. Update after creating Entra ID app registrations.')
+param aadApiClientId string = '00000000-0000-0000-0000-000000000000'
+
+@description('Azure AD audience for the API. Update after creating Entra ID app registrations.')
+param aadApiAudience string = '00000000-0000-0000-0000-000000000000'
+
+@description('Deploy Event Grid subscription. Set to false for initial deployment (function code must be deployed first).')
+param deployEventGrid bool = false
 
 @description('Required tags applied to all resources.')
 param tags object = {
@@ -87,14 +96,13 @@ resource functionAppSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01
 // Modules
 // ---------------------------------------------------------------------------
 
-// 1. Monitoring — LAW deploys to rg-security-dev-eus, App Insights stays in this RG
+// 1. Monitoring — LAW + App Insights in the project RG
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
   params: {
     location: location
     projectName: projectName
     environment: environment
-    lawResourceGroup: lawResourceGroup
     tags: tags
   }
 }
@@ -164,6 +172,9 @@ module appService 'modules/appservice.bicep' = {
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     apimOutboundIp: apimOutboundIp
+    aadTenantId: aadTenantId
+    aadApiClientId: aadApiClientId
+    aadApiAudience: aadApiAudience
     subnetId: appServiceSubnet.id
     tags: tags
   }
@@ -193,7 +204,21 @@ module functions 'modules/functions.bicep' = {
   }
 }
 
-// 9. APIM (depends on: appService)
+// 9. RBAC — role assignments for managed identities on storage accounts
+//    (depends on: identity, storageApp, storageFunc, functions)
+module rbac 'modules/rbac.bicep' = {
+  name: 'rbac'
+  params: {
+    apiPrincipalId: identity.outputs.apiIdentityPrincipalId
+    notifyPrincipalId: identity.outputs.notifyIdentityPrincipalId
+    provisionPrincipalId: identity.outputs.provisionIdentityPrincipalId
+    functionAppSystemPrincipalId: functions.outputs.functionAppSystemPrincipalId
+    appStorageAccountName: storageApp.outputs.storageAccountName
+    funcStorageAccountName: storageFunc.outputs.storageAccountName
+  }
+}
+
+// 10. APIM (depends on: appService)
 module apim 'modules/apim.bicep' = {
   name: 'apim'
   params: {
@@ -207,8 +232,10 @@ module apim 'modules/apim.bicep' = {
   }
 }
 
-// 10. Event Grid (depends on: storageApp, functions)
-module eventGrid 'modules/eventgrid.bicep' = {
+// 11. Event Grid (depends on: storageApp, functions)
+//     Conditional — skip on first deploy because the function code must be deployed first.
+//     Re-deploy with deployEventGrid=true after the CD pipeline deploys function code.
+module eventGrid 'modules/eventgrid.bicep' = if (deployEventGrid) {
   name: 'eventGrid'
   params: {
     location: location

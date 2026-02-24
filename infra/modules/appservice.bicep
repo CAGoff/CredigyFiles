@@ -32,6 +32,15 @@ param apimOutboundIp string = ''
 @description('Resource ID of the subnet for VNet integration.')
 param subnetId string
 
+@description('Azure AD tenant ID for JWT validation.')
+param aadTenantId string = '00000000-0000-0000-0000-000000000000'
+
+@description('Azure AD client ID of the API app registration.')
+param aadApiClientId string = '00000000-0000-0000-0000-000000000000'
+
+@description('Azure AD audience for the API (typically the API app registration client ID or URI).')
+param aadApiAudience string = '00000000-0000-0000-0000-000000000000'
+
 @description('Tags applied to all resources.')
 param tags object
 
@@ -102,15 +111,15 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'AzureAd__TenantId'
-          value: 'PLACEHOLDER_TENANT_ID'
+          value: aadTenantId
         }
         {
           name: 'AzureAd__ClientId'
-          value: 'PLACEHOLDER_API_APP_CLIENT_ID'
+          value: aadApiClientId
         }
         {
           name: 'AzureAd__Audience'
-          value: 'PLACEHOLDER_API_AUDIENCE'
+          value: aadApiAudience
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
