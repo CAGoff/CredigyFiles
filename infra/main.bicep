@@ -55,13 +55,13 @@ param appServiceSubnetName string = 'sn-credigyfiles-outbound-dev-172_23_17_192-
 param functionAppSubnetName string = 'sn-credigyfiles-func-outbound-dev-172_23_17_208-28'
 
 @description('Azure AD tenant ID for JWT validation. Update after creating Entra ID app registrations.')
-param aadTenantId string = '00000000-0000-0000-0000-000000000000'
+param aadTenantId string = '99fac1cb-b614-418f-a367-8002fcdf2b2f'
 
-@description('Azure AD client ID of the API app registration. Update after creating Entra ID app registrations.')
-param aadApiClientId string = '00000000-0000-0000-0000-000000000000'
+@description('Azure AD client ID of the API app registration.')
+param aadApiClientId string = 'fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 
-@description('Azure AD audience for the API. Update after creating Entra ID app registrations.')
-param aadApiAudience string = '00000000-0000-0000-0000-000000000000'
+@description('Azure AD audience for the API.')
+param aadApiAudience string = 'fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 
 @description('Deploy Event Grid subscription. Set to false for initial deployment (function code must be deployed first).')
 param deployEventGrid bool = false
