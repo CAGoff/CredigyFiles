@@ -162,25 +162,18 @@ jobs:
             --vnet "$VNET_ID" \
             --subnet sn-credigyfiles-func-outbound-dev-172_23_17_208-28
 
-      # 3. Deploy SPA to Static Web App
-      - name: Get SWA deployment token
-        id: swa-token
-        run: |
-          TOKEN=$(az staticwebapp secrets list \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-spa \
-            --query "properties.apiKey" --output tsv)
-          echo "::add-mask::$TOKEN"
-          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+      # 3. Deploy SPA to App Service
+      - name: Zip SPA
+        run: cd artifacts/web-dist && zip -r ../../web-package.zip .
 
       - name: Deploy SPA
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.token }}
-          action: upload
-          app_location: artifacts/web-dist
-          skip_app_build: true
-          skip_api_build: true
+        run: |
+          az webapp deploy \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-spa \
+            --src-path web-package.zip \
+            --type zip \
+            --clean true
 
       # 4. Re-sync Event Grid subscription
       - name: Update Event Grid subscription

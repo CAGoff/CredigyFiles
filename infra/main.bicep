@@ -66,9 +66,6 @@ param aadApiAudience string = 'api://fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 @description('Deploy Event Grid subscription. Set to false for initial deployment (function code must be deployed first).')
 param deployEventGrid bool = false
 
-@description('Custom domain for the SPA (e.g., files.credigy.com). Leave empty to skip custom domain binding.')
-param spaCustomDomain string = ''
-
 @description('Required tags applied to all resources.')
 param tags object = {
   Environment: 'Development'
@@ -143,13 +140,17 @@ module storageFunc 'modules/storage-func.bicep' = {
   }
 }
 
-// 5. Static Web App (Standard tier — supports custom domains + private endpoints)
-module staticWebApp 'modules/staticwebapp.bicep' = {
-  name: 'staticWebApp'
+// 5. SPA Web App (shares App Service Plan with the API)
+//    Depends on: appService (needs plan ID)
+module spaAppService 'modules/appservice-spa.bicep' = {
+  name: 'spaAppService'
   params: {
+    location: location
     projectName: projectName
     environment: environment
-    customDomain: spaCustomDomain
+    appServicePlanId: appService.outputs.appServicePlanId
+    subnetId: appServiceSubnet.id
+    publicNetworkAccess: 'Enabled'
     tags: tags
   }
 }
@@ -203,7 +204,7 @@ module functions 'modules/functions.bicep' = {
     funcDeployContainerName: storageFunc.outputs.deployContainerName
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
-    portalUrl: !empty(spaCustomDomain) ? 'https://${spaCustomDomain}' : 'https://${staticWebApp.outputs.staticWebAppHostname}'
+    portalUrl: 'https://${spaAppService.outputs.webAppHostname}'
     subnetId: functionAppSubnet.id
     tags: tags
   }
@@ -253,7 +254,7 @@ module eventGrid 'modules/eventgrid.bicep' = if (deployEventGrid) {
 }
 
 // ---------------------------------------------------------------------------
-// NOTE: Private endpoints (SWA + API) and DNS records (CNAMEs + private DNS)
+// NOTE: Private endpoints (SPA + API) and DNS records (CNAMEs + private DNS)
 //       are managed outside this template by the network team / manually.
 //       Module files are kept in modules/ for reference:
 //         - modules/private-endpoint.bicep
@@ -291,8 +292,8 @@ output apiWebAppHostname string = appService.outputs.webAppHostname
 @description('Default hostname of the Function App.')
 output functionAppHostname string = functions.outputs.functionAppHostname
 
-@description('Default hostname of the Static Web App.')
-output staticWebAppHostname string = staticWebApp.outputs.staticWebAppHostname
+@description('Default hostname of the SPA Web App.')
+output spaWebAppHostname string = spaAppService.outputs.webAppHostname
 
 @description('APIM gateway URL.')
 output apimGatewayUrl string = apim.outputs.apimGatewayUrl
@@ -300,8 +301,8 @@ output apimGatewayUrl string = apim.outputs.apimGatewayUrl
 @description('Application Insights connection string.')
 output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString
 
-@description('Resource ID of the Static Web App (needed for private endpoint creation).')
-output staticWebAppId string = staticWebApp.outputs.staticWebAppId
+@description('Resource ID of the SPA Web App (needed for private endpoint creation).')
+output spaWebAppId string = spaAppService.outputs.webAppId
 
 @description('Resource ID of the API Web App (needed for private endpoint creation).')
 output webAppId string = appService.outputs.webAppId
