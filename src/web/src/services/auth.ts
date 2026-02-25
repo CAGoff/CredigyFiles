@@ -34,10 +34,10 @@ export const msalConfig: Configuration = {
 };
 
 export const loginRequest = {
-  scopes: [`api://${apiClientId}/Files.ReadWrite`],
+  scopes: [`api://${apiClientId}/access_as_user`],
 };
 
 export const apiScopes = {
-  files: [`api://${apiClientId}/Files.ReadWrite`],
-  admin: [`api://${apiClientId}/Admin.ReadWrite`],
+  files: [`api://${apiClientId}/access_as_user`],
+  admin: [`api://${apiClientId}/access_as_user`],
 };

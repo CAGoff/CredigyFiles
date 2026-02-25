@@ -60,8 +60,8 @@ param aadTenantId string = '99fac1cb-b614-418f-a367-8002fcdf2b2f'
 @description('Azure AD client ID of the API app registration.')
 param aadApiClientId string = 'fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 
-@description('Azure AD audience for the API.')
-param aadApiAudience string = 'fa1dcccc-ce0d-463c-a28b-08085248ef2e'
+@description('Azure AD audience for the API (must match the identifier URI on the app registration).')
+param aadApiAudience string = 'api://fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 
 @description('Deploy Event Grid subscription. Set to false for initial deployment (function code must be deployed first).')
 param deployEventGrid bool = false
