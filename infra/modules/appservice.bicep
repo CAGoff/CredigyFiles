@@ -41,6 +41,13 @@ param aadApiClientId string = '00000000-0000-0000-0000-000000000000'
 @description('Azure AD audience for the API (typically the API app registration client ID or URI).')
 param aadApiAudience string = '00000000-0000-0000-0000-000000000000'
 
+@description('Whether to allow public network access. Set to Disabled after private endpoint is configured.')
+@allowed([
+  'Enabled'
+  'Disabled'
+])
+param publicNetworkAccess string = 'Enabled'
+
 @description('Tags applied to all resources.')
 param tags object
 
@@ -74,6 +81,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
+    publicNetworkAccess: publicNetworkAccess
     virtualNetworkSubnetId: subnetId
     siteConfig: {
       linuxFxVersion: 'DOTNETCORE|9.0'

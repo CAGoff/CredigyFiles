@@ -1,7 +1,8 @@
 // =============================================================================
 // Module: staticwebapp.bicep
-// Description: Azure Static Web App (Free tier) for the React SPA front-end
-//              of the Secure File Transfer project.
+// Description: Azure Static Web App (Standard tier) for the React SPA front-end
+//              of the Secure File Transfer project. Standard tier required for
+//              custom domains and private endpoints.
 // =============================================================================
 
 // Static Web Apps are not available in all regions. eastus2 is the closest
@@ -15,6 +16,9 @@ param projectName string
 @description('Deployment environment (dev, staging, prod).')
 param environment string
 
+@description('Custom domain to bind (e.g., files.credigy.com). Leave empty to skip.')
+param customDomain string = ''
+
 @description('Tags applied to all resources.')
 param tags object
 
@@ -25,8 +29,8 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   location: location
   tags: tags
   sku: {
-    name: 'Free'
-    tier: 'Free'
+    name: 'Standard'
+    tier: 'Standard'
   }
   properties: {
     stagingEnvironmentPolicy: 'Enabled'
@@ -36,6 +40,14 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
       outputLocation: 'dist'
     }
   }
+}
+
+// Custom domain with auto-provisioned managed SSL certificate.
+// Requires a CNAME record in public DNS pointing to the SWA default hostname.
+resource customDomainResource 'Microsoft.Web/staticSites/customDomains@2023-12-01' = if (!empty(customDomain)) {
+  parent: staticWebApp
+  name: customDomain
+  properties: {}
 }
 
 @description('Resource ID of the Static Web App.')

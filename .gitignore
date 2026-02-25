@@ -45,6 +45,9 @@ Thumbs.db
 # Secrets
 *.pfx
 *.key
+*.csr
+*.cer
+certs/
 .env
 .env.*
 !.env.development

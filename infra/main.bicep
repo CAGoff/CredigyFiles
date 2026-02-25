@@ -66,6 +66,15 @@ param aadApiAudience string = 'api://fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 @description('Deploy Event Grid subscription. Set to false for initial deployment (function code must be deployed first).')
 param deployEventGrid bool = false
 
+@description('Resource group containing the private DNS zones and public DNS zone.')
+param dnsZoneResourceGroup string = 'rg-network-prod-eus'
+
+@description('Custom domain for the SPA (e.g., files.credigy.com). Leave empty to skip.')
+param spaCustomDomain string = 'files.credigy.com'
+
+@description('Custom domain for the API (e.g., files-api.credigy.com). Leave empty to skip.')
+param apiCustomDomain string = 'files-api.credigy.com'
+
 @description('Required tags applied to all resources.')
 param tags object = {
   Environment: 'Development'
@@ -140,12 +149,13 @@ module storageFunc 'modules/storage-func.bicep' = {
   }
 }
 
-// 5. Static Web App (no dependencies — uses its own region, SWA not available in eastus)
+// 5. Static Web App (Standard tier — supports custom domains + private endpoints)
 module staticWebApp 'modules/staticwebapp.bicep' = {
   name: 'staticWebApp'
   params: {
     projectName: projectName
     environment: environment
+    customDomain: spaCustomDomain
     tags: tags
   }
 }
@@ -175,6 +185,7 @@ module appService 'modules/appservice.bicep' = {
     aadTenantId: aadTenantId
     aadApiClientId: aadApiClientId
     aadApiAudience: aadApiAudience
+    publicNetworkAccess: 'Disabled'
     subnetId: appServiceSubnet.id
     tags: tags
   }
@@ -198,7 +209,7 @@ module functions 'modules/functions.bicep' = {
     funcDeployContainerName: storageFunc.outputs.deployContainerName
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
-    portalUrl: 'https://${staticWebApp.outputs.staticWebAppHostname}'
+    portalUrl: !empty(spaCustomDomain) ? 'https://${spaCustomDomain}' : 'https://${staticWebApp.outputs.staticWebAppHostname}'
     subnetId: functionAppSubnet.id
     tags: tags
   }
@@ -247,6 +258,45 @@ module eventGrid 'modules/eventgrid.bicep' = if (deployEventGrid) {
   }
 }
 
+// 12. Private Endpoint for SWA (depends on: staticWebApp)
+module peSwa 'modules/private-endpoint.bicep' = {
+  name: 'peSwa'
+  params: {
+    location: location
+    privateEndpointName: 'sft-${projectName}-${environment}-pe-spa'
+    subnetId: appServiceSubnet.id
+    privateLinkServiceId: staticWebApp.outputs.staticWebAppId
+    groupId: 'staticSites'
+    privateDnsZoneId: resourceId(dnsZoneResourceGroup, 'Microsoft.Network/privateDnsZones', 'privatelink.azurestaticapps.net')
+    tags: tags
+  }
+}
+
+// 13. Private Endpoint for API (depends on: appService)
+module peApi 'modules/private-endpoint.bicep' = {
+  name: 'peApi'
+  params: {
+    location: location
+    privateEndpointName: 'sft-${projectName}-${environment}-pe-api'
+    subnetId: appServiceSubnet.id
+    privateLinkServiceId: appService.outputs.webAppId
+    groupId: 'sites'
+    privateDnsZoneId: resourceId(dnsZoneResourceGroup, 'Microsoft.Network/privateDnsZones', 'privatelink.azurewebsites.net')
+    tags: tags
+  }
+}
+
+// 14. Public DNS records (cross-RG — credigy.com zone in rg-network-prod-eus)
+//     Depends on: staticWebApp, appService (needs their hostnames for CNAMEs)
+module dnsRecords 'modules/dns-records.bicep' = {
+  name: 'dnsRecords'
+  scope: resourceGroup(dnsZoneResourceGroup)
+  params: {
+    swaDefaultHostname: staticWebApp.outputs.staticWebAppHostname
+    apiDefaultHostname: appService.outputs.webAppHostname
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Outputs
 // ---------------------------------------------------------------------------
@@ -286,3 +336,9 @@ output apimGatewayUrl string = apim.outputs.apimGatewayUrl
 
 @description('Application Insights connection string.')
 output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString
+
+@description('Custom domain for the SPA.')
+output spaCustomDomainName string = spaCustomDomain
+
+@description('Custom domain for the API (certificate must be uploaded manually via CLI).')
+output apiCustomDomainName string = apiCustomDomain

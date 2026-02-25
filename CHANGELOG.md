@@ -24,6 +24,10 @@
 - Bicep: Function App identity changed to `SystemAssigned, UserAssigned` for deployment storage auth
 - Bicep: Event Grid module is now conditional (`deployEventGrid` param, default false)
 - Bicep: Entra ID placeholders parameterized in App Service (`aadTenantId`, `aadApiClientId`, `aadApiAudience`)
+- Bicep: Entra ID values updated to real app registration IDs (tenant, API client, audience)
+- CD: GitHub env vars for SPA build (`VITE_AAD_TENANT_ID`, `VITE_AAD_CLIENT_ID`, `VITE_AAD_API_CLIENT_ID`)
+- Entra ID: API app registration configured (identifier URI, `access_as_user` scope, token v2, SPA pre-auth)
+- Entra ID: SPA app registration configured (redirect URIs for SWA + localhost, API permission, admin consent)
 - Bicep: LAW deploys in project RG (removed cross-RG dependency on rg-security-dev-eus)
 - React SPA: Vite dev proxy (`/v1` → `localhost:5292`) for local API calls
 - React SPA: `ApiError` class with structured error handling on all pages
@@ -44,7 +48,12 @@
 ### Fixed
 - CI: cross-platform filename sanitization (backslash handling for Linux)
 - CD: `azure/functions-action` changed from `@v2` (nonexistent) to `@v1`
+- CD: Flex Consumption VNet workaround — auto-remove/restore VNet integration around Functions deploy
+- CD: 60s propagation delay after VNet removal for Kudu connectivity
+- CD: Fetch SWA deployment token dynamically via `az staticwebapp secrets list`
 - Bicep: RBAC — added Queue/Table/AccountContributor roles for Function App system identity on func storage
+- Bicep: API audience set to identifier URI (`api://...`) instead of bare client ID
+- SPA: MSAL scopes aligned with Entra ID `access_as_user` scope (was `Files.ReadWrite`)
 - Download endpoint returns 404 instead of 500 when blob not found
 - OData filter injection risk in ActivityService and NotificationTrigger
 - NotificationTrigger no longer falls back to placeholder sender/portal URLs
