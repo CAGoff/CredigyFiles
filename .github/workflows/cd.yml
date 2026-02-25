@@ -143,6 +143,8 @@ jobs:
           az functionapp vnet-integration remove \
             --resource-group rg-credigyfiles-dev-eus \
             --name sft-credigyfiles-dev-func || true
+          echo "Waiting 60s for VNet removal to propagate..."
+          sleep 60
 
       - name: Deploy Functions
         uses: Azure/functions-action@v1
