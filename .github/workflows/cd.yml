@@ -136,11 +136,29 @@ jobs:
             --clean true
 
       # 2. Deploy Functions (Flex Consumption)
+      #    Workaround: Flex Consumption + VNet = Kudu can't reach blob storage.
+      #    Temporarily remove VNet integration, deploy, then re-add it.
+      - name: Remove Function App VNet integration
+        run: |
+          az functionapp vnet-integration remove \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-func || true
+
       - name: Deploy Functions
         uses: Azure/functions-action@v1
         with:
           app-name: sft-credigyfiles-dev-func
           package: artifacts/functions-package/functions-package.zip
+
+      - name: Restore Function App VNet integration
+        if: always()
+        run: |
+          VNET_ID="/subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-network-dev-eus/providers/Microsoft.Network/virtualNetworks/vnet-webapp-dev-eus"
+          az functionapp vnet-integration add \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-func \
+            --vnet "$VNET_ID" \
+            --subnet sn-credigyfiles-func-outbound-dev-172_23_17_208-28
 
       # 3. Deploy SPA to Static Web App
       - name: Get SWA deployment token
