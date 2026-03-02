@@ -36,7 +36,12 @@ if (!string.IsNullOrEmpty(connectionString))
 }
 else
 {
-    var credential = new DefaultAzureCredential();
+    // Use ManagedIdentityCredential directly in Azure to avoid the slow
+    // DefaultAzureCredential probe chain (Environment → Workload → MI → ...).
+    // Fall back to DefaultAzureCredential only in Development for local tooling.
+    var credential = builder.Environment.IsDevelopment()
+        ? new DefaultAzureCredential()
+        : (Azure.Core.TokenCredential)new ManagedIdentityCredential();
     var storageUri = builder.Configuration["Storage:AccountUri"]
         ?? throw new InvalidOperationException("Storage:AccountUri or Storage:ConnectionString is required");
 

@@ -136,6 +136,11 @@ jobs:
             --resource-group rg-credigyfiles-dev-eus \
             --name sft-credigyfiles-dev-spa \
             --set publicNetworkAccess=Enabled
+          az storage account update \
+            --name sftcredigyfilesdevfunc \
+            --resource-group rg-credigyfiles-dev-eus \
+            --public-network-access Enabled \
+            --default-action Allow
           echo "Waiting 60s for access changes to propagate..."
           sleep 60
 
@@ -211,6 +216,11 @@ jobs:
             --resource-group rg-credigyfiles-dev-eus \
             --name sft-credigyfiles-dev-spa \
             --set publicNetworkAccess=Disabled
+          az storage account update \
+            --name sftcredigyfilesdevfunc \
+            --resource-group rg-credigyfiles-dev-eus \
+            --default-action Deny \
+            --public-network-access Disabled
 
       # 5. Re-sync Event Grid subscription
       - name: Update Event Grid subscription
