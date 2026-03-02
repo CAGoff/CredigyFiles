@@ -1,18 +1,20 @@
+using SecureFileTransfer.Api.Models;
 using SecureFileTransfer.Api.Services;
 
 namespace SecureFileTransfer.Api.Middleware;
 
 /// <summary>
 /// Validates that the authenticated caller has access to the requested container.
-/// Checks the caller's identity against the third-party registry.
+/// Checks Entra ID security group membership and service principal identity
+/// against the third-party registry.
 /// </summary>
 public static class ContainerAccessExtensions
 {
     /// <summary>
-    /// Verifies the current user has access to the specified container.
-    /// Returns true if access is granted, false otherwise.
+    /// Checks the current user's access to the specified container.
+    /// Returns a <see cref="ContainerAccessResult"/> indicating access level and delete permission.
     /// </summary>
-    public static async Task<bool> HasContainerAccessAsync(
+    public static async Task<ContainerAccessResult> CheckContainerAccessAsync(
         this HttpContext context,
         IActivityService activityService,
         string containerName,
@@ -24,16 +26,20 @@ public static class ContainerAccessExtensions
         if (string.IsNullOrEmpty(userId))
         {
             logger.LogWarning("Container access denied: no user identity in token for container {Container}", containerName);
-            return false;
+            return ContainerAccessResult.None;
         }
 
         var isAdmin = context.User.IsInRole("SFT.Admin");
-        var isOrgUser = context.User.IsInRole("SFT.User");
 
-        var hasAccess = await activityService.UserHasContainerAccessAsync(
-            userId, containerName, isAdmin, isOrgUser);
+        // Extract groups claim (Entra ID sends as multiple "groups" claims)
+        var userGroups = context.User.FindAll("groups")
+            .Select(c => c.Value)
+            .ToList();
 
-        if (!hasAccess)
+        var result = await activityService.UserHasContainerAccessAsync(
+            userId, userGroups, containerName, isAdmin);
+
+        if (!result.HasAccess)
         {
             var correlationId = context.Items["CorrelationId"]?.ToString() ?? "unknown";
             logger.LogWarning(
@@ -41,6 +47,6 @@ public static class ContainerAccessExtensions
                 userId, containerName, correlationId);
         }
 
-        return hasAccess;
+        return result;
     }
 }

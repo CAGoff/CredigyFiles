@@ -27,116 +27,127 @@ public class ActivityServiceTests
         _service = new ActivityService(_mockTableServiceClient.Object, _mockLogger.Object);
     }
 
-    [Fact]
-    public async Task UserHasContainerAccessAsync_AdminUser_ReturnsTrue_WhenContainerActive()
-    {
-        var thirdParty = new ThirdParty
-        {
-            PartitionKey = "ThirdParty",
-            RowKey = "tp-001",
-            ContainerName = "sft-acme",
-            Status = "active",
-            ServicePrincipalObjectId = "sp-other"
-        };
+    // --- UserHasContainerAccessAsync ---
 
+    [Fact]
+    public async Task UserHasContainerAccessAsync_AdminUser_ReturnsFull()
+    {
+        var thirdParty = CreateThirdParty("sft-acme", "active", "sp-other");
         SetupQueryResult(thirdParty);
 
         var result = await _service.UserHasContainerAccessAsync(
-            "admin-user-id", "sft-acme", isAdmin: true, isOrgUser: false);
+            "admin-user-id", Array.Empty<string>(), "sft-acme", isAdmin: true);
 
-        Assert.True(result);
+        Assert.True(result.HasAccess);
+        Assert.True(result.CanDelete);
     }
 
     [Fact]
-    public async Task UserHasContainerAccessAsync_OrgUser_ReturnsTrue_WhenContainerActive()
+    public async Task UserHasContainerAccessAsync_UserGroupMatch_ReturnsReadOnly()
     {
-        var thirdParty = new ThirdParty
-        {
-            PartitionKey = "ThirdParty",
-            RowKey = "tp-001",
-            ContainerName = "sft-acme",
-            Status = "active",
-            ServicePrincipalObjectId = "sp-other"
-        };
-
+        var thirdParty = CreateThirdParty("sft-acme", "active", "sp-other",
+            userGroupId: "group-acme-users");
         SetupQueryResult(thirdParty);
 
         var result = await _service.UserHasContainerAccessAsync(
-            "org-user-id", "sft-acme", isAdmin: false, isOrgUser: true);
+            "some-user", new[] { "group-acme-users" }, "sft-acme", isAdmin: false);
 
-        Assert.True(result);
+        Assert.True(result.HasAccess);
+        Assert.False(result.CanDelete);
     }
 
     [Fact]
-    public async Task UserHasContainerAccessAsync_ThirdPartyMatching_ReturnsTrue()
+    public async Task UserHasContainerAccessAsync_AdminGroupMatch_ReturnsFull()
     {
-        var thirdParty = new ThirdParty
-        {
-            PartitionKey = "ThirdParty",
-            RowKey = "tp-001",
-            ContainerName = "sft-acme",
-            Status = "active",
-            ServicePrincipalObjectId = "sp-matching-id"
-        };
-
+        var thirdParty = CreateThirdParty("sft-acme", "active", "sp-other",
+            userGroupId: "group-acme-users", adminGroupId: "group-acme-admins");
         SetupQueryResult(thirdParty);
 
         var result = await _service.UserHasContainerAccessAsync(
-            "sp-matching-id", "sft-acme", isAdmin: false, isOrgUser: false);
+            "some-user", new[] { "group-acme-admins" }, "sft-acme", isAdmin: false);
 
-        Assert.True(result);
+        Assert.True(result.HasAccess);
+        Assert.True(result.CanDelete);
     }
 
     [Fact]
-    public async Task UserHasContainerAccessAsync_ThirdPartyNonMatching_ReturnsFalse()
+    public async Task UserHasContainerAccessAsync_BothGroupsMatch_ReturnsFull()
     {
-        var thirdParty = new ThirdParty
-        {
-            PartitionKey = "ThirdParty",
-            RowKey = "tp-001",
-            ContainerName = "sft-acme",
-            Status = "active",
-            ServicePrincipalObjectId = "sp-other"
-        };
-
+        var thirdParty = CreateThirdParty("sft-acme", "active", "sp-other",
+            userGroupId: "group-acme-users", adminGroupId: "group-acme-admins");
         SetupQueryResult(thirdParty);
 
         var result = await _service.UserHasContainerAccessAsync(
-            "sp-wrong-id", "sft-acme", isAdmin: false, isOrgUser: false);
+            "some-user", new[] { "group-acme-users", "group-acme-admins" }, "sft-acme", isAdmin: false);
 
-        Assert.False(result);
+        Assert.True(result.HasAccess);
+        Assert.True(result.CanDelete);
     }
 
     [Fact]
-    public async Task UserHasContainerAccessAsync_InactiveContainer_ReturnsFalse()
+    public async Task UserHasContainerAccessAsync_NoGroupsNoRole_ReturnsNone()
     {
-        var thirdParty = new ThirdParty
-        {
-            PartitionKey = "ThirdParty",
-            RowKey = "tp-001",
-            ContainerName = "sft-acme",
-            Status = "inactive",
-            ServicePrincipalObjectId = "sp-id"
-        };
-
+        var thirdParty = CreateThirdParty("sft-acme", "active", "sp-other",
+            userGroupId: "group-acme-users");
         SetupQueryResult(thirdParty);
 
         var result = await _service.UserHasContainerAccessAsync(
-            "sp-id", "sft-acme", isAdmin: true, isOrgUser: false);
+            "some-user", Array.Empty<string>(), "sft-acme", isAdmin: false);
 
-        Assert.False(result);
+        Assert.False(result.HasAccess);
+        Assert.False(result.CanDelete);
     }
 
     [Fact]
-    public async Task UserHasContainerAccessAsync_NoRegistryEntry_ReturnsFalse()
+    public async Task UserHasContainerAccessAsync_ServicePrincipalMatch_ReturnsFull()
+    {
+        var thirdParty = CreateThirdParty("sft-acme", "active", "sp-matching-id");
+        SetupQueryResult(thirdParty);
+
+        var result = await _service.UserHasContainerAccessAsync(
+            "sp-matching-id", Array.Empty<string>(), "sft-acme", isAdmin: false);
+
+        Assert.True(result.HasAccess);
+        Assert.True(result.CanDelete);
+    }
+
+    [Fact]
+    public async Task UserHasContainerAccessAsync_ServicePrincipalNonMatch_ReturnsNone()
+    {
+        var thirdParty = CreateThirdParty("sft-acme", "active", "sp-other");
+        SetupQueryResult(thirdParty);
+
+        var result = await _service.UserHasContainerAccessAsync(
+            "sp-wrong-id", Array.Empty<string>(), "sft-acme", isAdmin: false);
+
+        Assert.False(result.HasAccess);
+    }
+
+    [Fact]
+    public async Task UserHasContainerAccessAsync_InactiveContainer_ReturnsNone()
+    {
+        var thirdParty = CreateThirdParty("sft-acme", "inactive", "sp-id",
+            userGroupId: "group-acme-users");
+        SetupQueryResult(thirdParty);
+
+        var result = await _service.UserHasContainerAccessAsync(
+            "some-user", new[] { "group-acme-users" }, "sft-acme", isAdmin: true);
+
+        Assert.False(result.HasAccess);
+    }
+
+    [Fact]
+    public async Task UserHasContainerAccessAsync_NoRegistryEntry_ReturnsNone()
     {
         SetupEmptyQueryResult();
 
         var result = await _service.UserHasContainerAccessAsync(
-            "any-user", "sft-nonexistent", isAdmin: true, isOrgUser: false);
+            "any-user", Array.Empty<string>(), "sft-nonexistent", isAdmin: true);
 
-        Assert.False(result);
+        Assert.False(result.HasAccess);
     }
+
+    // --- GetAccessibleContainersAsync ---
 
     [Fact]
     public async Task GetAccessibleContainersAsync_Admin_ReturnsAllActive()
@@ -151,7 +162,7 @@ public class ActivityServiceTests
         SetupQueryResults(parties);
 
         var result = await _service.GetAccessibleContainersAsync(
-            "admin-user", isAdmin: true, isOrgUser: false);
+            "admin-user", Array.Empty<string>(), isAdmin: true);
 
         Assert.Equal(2, result.Count);
         Assert.Contains("sft-acme", result);
@@ -160,41 +171,64 @@ public class ActivityServiceTests
     }
 
     [Fact]
-    public async Task GetAccessibleContainersAsync_ThirdParty_ReturnsOnlyMatching()
+    public async Task GetAccessibleContainersAsync_UserGroup_ReturnsMatching()
     {
         var parties = new[]
         {
-            CreateThirdParty("sft-acme", "active", "sp-1"),
-            CreateThirdParty("sft-globex", "active", "sp-2"),
-            CreateThirdParty("sft-other", "active", "sp-3"),
+            CreateThirdParty("sft-acme", "active", "sp-1", userGroupId: "group-acme-users"),
+            CreateThirdParty("sft-globex", "active", "sp-2", userGroupId: "group-globex-users"),
+            CreateThirdParty("sft-other", "active", "sp-3", userGroupId: "group-other-users"),
         };
 
         SetupQueryResults(parties);
 
         var result = await _service.GetAccessibleContainersAsync(
-            "sp-2", isAdmin: false, isOrgUser: false);
+            "some-user", new[] { "group-acme-users", "group-globex-users" }, isAdmin: false);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains("sft-acme", result);
+        Assert.Contains("sft-globex", result);
+    }
+
+    [Fact]
+    public async Task GetAccessibleContainersAsync_ServicePrincipal_ReturnsMatching()
+    {
+        var parties = new[]
+        {
+            CreateThirdParty("sft-acme", "active", "sp-1"),
+            CreateThirdParty("sft-globex", "active", "sp-2"),
+        };
+
+        SetupQueryResults(parties);
+
+        var result = await _service.GetAccessibleContainersAsync(
+            "sp-2", Array.Empty<string>(), isAdmin: false);
 
         Assert.Single(result);
         Assert.Equal("sft-globex", result[0]);
     }
 
     [Fact]
-    public async Task GetAccessibleContainersAsync_ThirdParty_NoMatch_ReturnsEmpty()
+    public async Task GetAccessibleContainersAsync_NoMatch_ReturnsEmpty()
     {
         var parties = new[]
         {
-            CreateThirdParty("sft-acme", "active", "sp-1"),
+            CreateThirdParty("sft-acme", "active", "sp-1", userGroupId: "group-acme-users"),
         };
 
         SetupQueryResults(parties);
 
         var result = await _service.GetAccessibleContainersAsync(
-            "sp-nonexistent", isAdmin: false, isOrgUser: false);
+            "sp-nonexistent", Array.Empty<string>(), isAdmin: false);
 
         Assert.Empty(result);
     }
 
-    private static ThirdParty CreateThirdParty(string containerName, string status, string spId)
+    // --- Helpers ---
+
+    private static ThirdParty CreateThirdParty(
+        string containerName, string status, string spId,
+        string? userGroupId = null, string? adminGroupId = null)
     {
         return new ThirdParty
         {
@@ -202,7 +236,9 @@ public class ActivityServiceTests
             RowKey = $"tp-{Guid.NewGuid():N}"[..10],
             ContainerName = containerName,
             Status = status,
-            ServicePrincipalObjectId = spId
+            ServicePrincipalObjectId = spId,
+            UserGroupId = userGroupId,
+            AdminGroupId = adminGroupId
         };
     }
 

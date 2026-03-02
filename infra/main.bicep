@@ -54,6 +54,9 @@ param appServiceSubnetName string = 'sn-credigyfiles-outbound-dev-172_23_17_192-
 @description('Name of the existing subnet for Function App VNet integration (must be delegated to Microsoft.App/environments).')
 param functionAppSubnetName string = 'sn-credigyfiles-func-outbound-dev-172_23_17_208-28'
 
+@description('Name of the dedicated /27 subnet for APIM VNet integration (no delegation).')
+param apimSubnetName string = 'sn-credigyfiles-apim-inbound-dev-172_23_17_224-27'
+
 @description('Azure AD tenant ID for JWT validation. Update after creating Entra ID app registrations.')
 param aadTenantId string = '99fac1cb-b614-418f-a367-8002fcdf2b2f'
 
@@ -90,6 +93,11 @@ resource appServiceSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01'
 resource functionAppSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
   parent: vnet
   name: functionAppSubnetName
+}
+
+resource apimSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
+  parent: vnet
+  name: apimSubnetName
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +232,7 @@ module rbac 'modules/rbac.bicep' = {
   }
 }
 
-// 10. APIM (depends on: appService)
+// 10. APIM — Developer tier with External VNet (depends on: appService)
 module apim 'modules/apim.bicep' = {
   name: 'apim'
   params: {
@@ -234,6 +242,7 @@ module apim 'modules/apim.bicep' = {
     publisherEmail: apimPublisherEmail
     publisherName: apimPublisherName
     backendWebAppHostname: appService.outputs.webAppHostname
+    apimSubnetId: apimSubnet.id
     tags: tags
   }
 }

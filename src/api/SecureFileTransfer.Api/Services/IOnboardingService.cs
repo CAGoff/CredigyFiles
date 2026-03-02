@@ -8,5 +8,5 @@ public interface IOnboardingService
     Task<ThirdParty?> GetThirdPartyAsync(string id);
     Task<IReadOnlyList<ThirdParty>> ListThirdPartiesAsync(int take = 100);
     Task UpdateThirdPartyAsync(ThirdParty thirdParty);
-    Task RequestDeprovisioningAsync(string id);
+    Task RequestDeactivationAsync(string id);
 }

@@ -23,7 +23,8 @@ public class ActivityController : ControllerBase
     [HttpGet("containers/{containerName}/activity")]
     public async Task<IActionResult> GetContainerActivity(string containerName, [FromQuery] int top = 50)
     {
-        if (!await HttpContext.HasContainerAccessAsync(_activityService, containerName, _logger))
+        var access = await HttpContext.CheckContainerAccessAsync(_activityService, containerName, _logger);
+        if (!access.HasAccess)
             return Forbid();
 
         var records = await _activityService.GetActivityAsync(containerName, top);

@@ -42,6 +42,8 @@ public partial class OnboardingService : IOnboardingService
             ContainerName = containerName,
             ContactEmail = request.ContactEmail,
             AutomationEnabled = request.EnableAutomation,
+            UserGroupId = request.UserGroupId,
+            AdminGroupId = request.AdminGroupId,
             Status = "provisioning"
         };
 
@@ -64,7 +66,7 @@ public partial class OnboardingService : IOnboardingService
 
         _logger.LogInformation("Provisioning requested for {Company} (container: {Container})", request.CompanyName, containerName);
 
-        return new ThirdPartyResponse(id, request.CompanyName, containerName, null, "provisioning", DateTimeOffset.UtcNow);
+        return new ThirdPartyResponse(id, request.CompanyName, containerName, null, "provisioning", DateTimeOffset.UtcNow, request.UserGroupId, request.AdminGroupId);
     }
 
     public async Task<ThirdParty?> GetThirdPartyAsync(string id)
@@ -104,29 +106,29 @@ public partial class OnboardingService : IOnboardingService
         await tableClient.UpsertEntityAsync(thirdParty, TableUpdateMode.Replace);
     }
 
-    public async Task RequestDeprovisioningAsync(string id)
+    public async Task RequestDeactivationAsync(string id)
     {
         var entity = await GetThirdPartyAsync(id);
         if (entity is null) return;
 
-        entity.Status = "deprovisioning";
+        entity.Status = "deactivating";
         await UpdateThirdPartyAsync(entity);
 
-        // Enqueue deprovisioning request
+        // Enqueue deactivation request (container is preserved)
         var queueName = _configuration["Storage:ProvisioningQueueName"] ?? "sft-provisioning";
         var queueClient = _queueServiceClient.GetQueueClient(queueName);
         await queueClient.CreateIfNotExistsAsync();
 
         var message = JsonSerializer.Serialize(new
         {
-            Action = "deprovision",
+            Action = "deactivate",
             ThirdPartyId = id,
             entity.ContainerName,
             entity.AppRegistrationId
         });
         await queueClient.SendMessageAsync(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(message)));
 
-        _logger.LogInformation("Deprovisioning requested for {Id} (container: {Container})", id, entity.ContainerName);
+        _logger.LogInformation("Deactivation requested for {Id} (container preserved: {Container})", id, entity.ContainerName);
     }
 
     private static string SanitizeCompanyName(string name)

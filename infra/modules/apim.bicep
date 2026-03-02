@@ -1,7 +1,7 @@
 // =============================================================================
 // Module: apim.bicep
-// Description: Azure API Management (Consumption tier) instance with a
-//              placeholder API definition for the Secure File Transfer API.
+// Description: Azure API Management (Developer tier) with External VNet
+//              integration and the Secure File Transfer API definition.
 // =============================================================================
 
 @description('Azure region for the APIM instance.')
@@ -22,22 +22,54 @@ param publisherName string = 'Secure File Transfer'
 @description('Default hostname of the backend Web App.')
 param backendWebAppHostname string
 
+@description('Resource ID of the dedicated APIM subnet (must be /27, no delegation).')
+param apimSubnetId string
+
 @description('Tags applied to all resources.')
 param tags object
 
 var baseName = 'sft-${projectName}-${environment}'
+
+// ---------------------------------------------------------------------------
+// Public IP for APIM (required for External VNet mode)
+// ---------------------------------------------------------------------------
+
+resource publicIp 'Microsoft.Network/publicIPAddresses@2024-01-01' = {
+  name: '${baseName}-apim-pip'
+  location: location
+  tags: tags
+  sku: {
+    name: 'Standard'
+    tier: 'Regional'
+  }
+  properties: {
+    publicIPAllocationMethod: 'Static'
+    dnsSettings: {
+      domainNameLabel: '${baseName}-apim'
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// APIM — Developer tier with External VNet
+// ---------------------------------------------------------------------------
 
 resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
   name: '${baseName}-apim'
   location: location
   tags: tags
   sku: {
-    name: 'Consumption'
-    capacity: 0
+    name: 'Developer'
+    capacity: 1
   }
   properties: {
     publisherEmail: publisherEmail
     publisherName: publisherName
+    virtualNetworkType: 'External'
+    virtualNetworkConfiguration: {
+      subnetResourceId: apimSubnetId
+    }
+    publicIpAddressId: publicIp.id
   }
 }
 

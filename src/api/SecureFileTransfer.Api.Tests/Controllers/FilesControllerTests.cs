@@ -229,7 +229,7 @@ public class FilesControllerTests
     // --- DeleteFile ---
 
     [Fact]
-    public async Task DeleteFile_ValidRequest_ReturnsNoContent()
+    public async Task DeleteFile_FullAccess_ReturnsNoContent()
     {
         SetupAccessGranted();
 
@@ -237,6 +237,29 @@ public class FilesControllerTests
         var result = await controller.DeleteFile("sft-acme", "report.pdf", "inbound");
 
         Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task DeleteFile_ReadOnlyAccess_Returns403()
+    {
+        SetupAccessReadOnly();
+
+        var controller = CreateController("user-oid", groups: new[] { "group-acme-users" });
+        var result = await controller.DeleteFile("sft-acme", "report.pdf", "inbound");
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(403, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteFile_AccessDenied_ReturnsForbid()
+    {
+        SetupAccessDenied();
+
+        var controller = CreateController("sp-wrong");
+        var result = await controller.DeleteFile("sft-acme", "report.pdf", "inbound");
+
+        Assert.IsType<ForbidResult>(result);
     }
 
     [Fact]
@@ -269,18 +292,31 @@ public class FilesControllerTests
     private void SetupAccessGranted()
     {
         _mockActivityService
-            .Setup(x => x.UserHasContainerAccessAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>()))
-            .ReturnsAsync(true);
+            .Setup(x => x.UserHasContainerAccessAsync(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string>(), It.IsAny<bool>()))
+            .ReturnsAsync(ContainerAccessResult.Full);
+    }
+
+    private void SetupAccessReadOnly()
+    {
+        _mockActivityService
+            .Setup(x => x.UserHasContainerAccessAsync(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string>(), It.IsAny<bool>()))
+            .ReturnsAsync(ContainerAccessResult.ReadOnly);
     }
 
     private void SetupAccessDenied()
     {
         _mockActivityService
-            .Setup(x => x.UserHasContainerAccessAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<bool>()))
-            .ReturnsAsync(false);
+            .Setup(x => x.UserHasContainerAccessAsync(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string>(), It.IsAny<bool>()))
+            .ReturnsAsync(ContainerAccessResult.None);
     }
 
-    private FilesController CreateController(string userId, string? role = null)
+    private FilesController CreateController(string userId, string? role = null, string[]? groups = null)
     {
         var claims = new List<Claim>
         {
@@ -289,6 +325,9 @@ public class FilesControllerTests
         };
         if (role is not null)
             claims.Add(new Claim(ClaimTypes.Role, role));
+        if (groups is not null)
+            foreach (var g in groups)
+                claims.Add(new Claim("groups", g));
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var principal = new ClaimsPrincipal(identity);

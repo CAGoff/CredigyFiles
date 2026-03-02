@@ -21,13 +21,24 @@ public class ThirdParty : ITableEntity
     public string? ServicePrincipalObjectId { get; set; }
     public string? CertificateThumbprint { get; set; }
     public bool AutomationEnabled { get; set; }
-    public string Status { get; set; } = "provisioning"; // provisioning, active, deprovisioning, inactive
+
+    /// <summary>Entra ID object ID of the security group granting read/upload/download access.</summary>
+    public string? UserGroupId { get; set; }
+
+    /// <summary>Entra ID object ID of the security group granting full access including delete.</summary>
+    public string? AdminGroupId { get; set; }
+
+    public string Status { get; set; } = "provisioning"; // provisioning, active, deactivating, inactive
 }
 
 public record ThirdPartyCreateRequest(
     string CompanyName,
     string ContactEmail,
-    bool EnableAutomation);
+    bool EnableAutomation,
+    string? UserGroupId = null,
+    string? AdminGroupId = null);
+
+public record ThirdPartyStatusRequest(string Status);
 
 public record ThirdPartyResponse(
     string Id,
@@ -35,4 +46,6 @@ public record ThirdPartyResponse(
     string ContainerName,
     string? AppRegistrationId,
     string Status,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? UserGroupId,
+    string? AdminGroupId);

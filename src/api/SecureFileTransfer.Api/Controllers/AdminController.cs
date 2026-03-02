@@ -63,21 +63,32 @@ public class AdminController : ControllerBase
         party.CompanyName = request.CompanyName;
         party.ContactEmail = request.ContactEmail;
         party.AutomationEnabled = request.EnableAutomation;
+        party.UserGroupId = request.UserGroupId;
+        party.AdminGroupId = request.AdminGroupId;
         await _onboarding.UpdateThirdPartyAsync(party);
 
         return Ok(ToResponse(party));
     }
 
-    /// <summary>Deprovision a third party.</summary>
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteThirdParty(string id)
+    /// <summary>Set third-party status (e.g., deactivate).</summary>
+    [HttpPatch("{id}/status")]
+    public async Task<IActionResult> UpdateThirdPartyStatus(string id, [FromBody] ThirdPartyStatusRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.Status))
+            return BadRequest(new { error = new { code = "INVALID_INPUT", message = "Status is required." } });
+
+        if (request.Status != "inactive")
+            return BadRequest(new { error = new { code = "INVALID_INPUT", message = "Only 'inactive' status is supported." } });
+
         var party = await _onboarding.GetThirdPartyAsync(id);
         if (party is null)
             return NotFound(new { error = new { code = "NOT_FOUND", message = "Third party not found." } });
 
-        await _onboarding.RequestDeprovisioningAsync(id);
-        return Accepted(new { status = "deprovisioning" });
+        if (party.Status != "active")
+            return Conflict(new { error = new { code = "INVALID_STATE", message = $"Cannot deactivate a third party with status '{party.Status}'." } });
+
+        await _onboarding.RequestDeactivationAsync(id);
+        return Accepted(new { status = "deactivating" });
     }
 
     private static ThirdPartyResponse ToResponse(ThirdParty p) => new(
@@ -86,5 +97,7 @@ public class AdminController : ControllerBase
         ContainerName: p.ContainerName,
         AppRegistrationId: p.AppRegistrationId,
         Status: p.Status,
-        CreatedAt: p.Timestamp ?? DateTimeOffset.MinValue);
+        CreatedAt: p.Timestamp ?? DateTimeOffset.MinValue,
+        UserGroupId: p.UserGroupId,
+        AdminGroupId: p.AdminGroupId);
 }

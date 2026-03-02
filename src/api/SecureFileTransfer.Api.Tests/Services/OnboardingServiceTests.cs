@@ -63,6 +63,8 @@ public class OnboardingServiceTests
         Assert.StartsWith("tp-", result.Id);
         Assert.StartsWith("sft-", result.ContainerName);
         Assert.Null(result.AppRegistrationId);
+        Assert.Null(result.UserGroupId);
+        Assert.Null(result.AdminGroupId);
     }
 
     [Fact]
@@ -149,7 +151,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async Task RequestDeprovisioningAsync_UpdatesStatusAndQueues()
+    public async Task RequestDeactivationAsync_UpdatesStatusAndQueues()
     {
         var entity = new ThirdParty
         {
@@ -165,10 +167,10 @@ public class OnboardingServiceTests
                 It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Response.FromValue(entity, Mock.Of<Response>()));
 
-        await _service.RequestDeprovisioningAsync("tp-001");
+        await _service.RequestDeactivationAsync("tp-001");
 
         _mockTableClient.Verify(x => x.UpsertEntityAsync(
-            It.Is<ThirdParty>(tp => tp.Status == "deprovisioning"),
+            It.Is<ThirdParty>(tp => tp.Status == "deactivating"),
             TableUpdateMode.Replace,
             It.IsAny<CancellationToken>()), Times.Once);
 
@@ -177,16 +179,35 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async Task RequestDeprovisioningAsync_NotFound_DoesNothing()
+    public async Task RequestDeactivationAsync_NotFound_DoesNothing()
     {
         _mockTableClient
             .Setup(x => x.GetEntityAsync<ThirdParty>("ThirdParty", "tp-missing",
                 It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new RequestFailedException(404, "Not Found"));
 
-        await _service.RequestDeprovisioningAsync("tp-missing");
+        await _service.RequestDeactivationAsync("tp-missing");
 
         _mockQueueClient.Verify(x => x.SendMessageAsync(
             It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RequestProvisioningAsync_WithGroupIds_StoresAndReturnsGroupIds()
+    {
+        var request = new ThirdPartyCreateRequest(
+            "Acme Corp", "admin@acme.com", true,
+            UserGroupId: "group-acme-users", AdminGroupId: "group-acme-admins");
+
+        var result = await _service.RequestProvisioningAsync(request);
+
+        Assert.Equal("group-acme-users", result.UserGroupId);
+        Assert.Equal("group-acme-admins", result.AdminGroupId);
+
+        _mockTableClient.Verify(x => x.AddEntityAsync(
+            It.Is<ThirdParty>(tp =>
+                tp.UserGroupId == "group-acme-users" &&
+                tp.AdminGroupId == "group-acme-admins"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

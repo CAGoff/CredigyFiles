@@ -126,7 +126,13 @@ export async function listThirdParties(msal: IPublicClientApplication) {
 
 export async function createThirdParty(
   msal: IPublicClientApplication,
-  data: { companyName: string; contactEmail: string; enableAutomation: boolean }
+  data: {
+    companyName: string;
+    contactEmail: string;
+    enableAutomation: boolean;
+    userGroupId?: string;
+    adminGroupId?: string;
+  }
 ) {
   const res = await apiFetch(msal, "/admin/third-parties", {
     method: "POST",
@@ -138,5 +144,14 @@ export async function createThirdParty(
 
 export async function getThirdParty(msal: IPublicClientApplication, id: string) {
   const res = await apiFetch(msal, `/admin/third-parties/${id}`, {}, apiScopes.admin);
+  return res.json();
+}
+
+export async function deactivateThirdParty(msal: IPublicClientApplication, id: string) {
+  const res = await apiFetch(msal, `/admin/third-parties/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "inactive" }),
+  }, apiScopes.admin);
   return res.json();
 }

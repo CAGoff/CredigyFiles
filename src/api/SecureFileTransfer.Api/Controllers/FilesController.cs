@@ -37,7 +37,8 @@ public class FilesController : ControllerBase
         if (!FileValidationService.IsValidDirectory(dir))
             return BadRequest(new { error = new { code = "INVALID_DIRECTORY", message = "dir must be 'inbound' or 'outbound'." } });
 
-        if (!await HttpContext.HasContainerAccessAsync(_activityService, containerName, _logger))
+        var access = await HttpContext.CheckContainerAccessAsync(_activityService, containerName, _logger);
+        if (!access.HasAccess)
             return Forbid();
 
         var files = await _blobStorage.ListFilesAsync(containerName, dir, top);
@@ -51,7 +52,8 @@ public class FilesController : ControllerBase
         if (!FileValidationService.IsValidDirectory(dir))
             return BadRequest(new { error = new { code = "INVALID_DIRECTORY", message = "dir must be 'inbound' or 'outbound'." } });
 
-        if (!await HttpContext.HasContainerAccessAsync(_activityService, containerName, _logger))
+        var access = await HttpContext.CheckContainerAccessAsync(_activityService, containerName, _logger);
+        if (!access.HasAccess)
             return Forbid();
 
         var sanitized = FileValidationService.SanitizeFileName(fileName);
@@ -78,7 +80,8 @@ public class FilesController : ControllerBase
         if (!FileValidationService.IsValidDirectory(dir))
             return BadRequest(new { error = new { code = "INVALID_DIRECTORY", message = "dir must be 'inbound' or 'outbound'." } });
 
-        if (!await HttpContext.HasContainerAccessAsync(_activityService, containerName, _logger))
+        var access = await HttpContext.CheckContainerAccessAsync(_activityService, containerName, _logger);
+        if (!access.HasAccess)
             return Forbid();
 
         if (file is null || file.Length == 0)
@@ -123,8 +126,11 @@ public class FilesController : ControllerBase
         if (!FileValidationService.IsValidDirectory(dir))
             return BadRequest(new { error = new { code = "INVALID_DIRECTORY", message = "dir must be 'inbound' or 'outbound'." } });
 
-        if (!await HttpContext.HasContainerAccessAsync(_activityService, containerName, _logger))
+        var access = await HttpContext.CheckContainerAccessAsync(_activityService, containerName, _logger);
+        if (!access.HasAccess)
             return Forbid();
+        if (!access.CanDelete)
+            return StatusCode(403, new { error = new { code = "DELETE_DENIED", message = "You do not have delete permission for this container." } });
 
         var sanitized = FileValidationService.SanitizeFileName(fileName);
         if (sanitized is null)

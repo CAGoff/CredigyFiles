@@ -42,7 +42,7 @@ public class ContainersControllerTests
             .ReturnsAsync(allContainers);
 
         _mockActivityService
-            .Setup(x => x.GetAccessibleContainersAsync("admin-oid", true, false))
+            .Setup(x => x.GetAccessibleContainersAsync("admin-oid", It.IsAny<IReadOnlyList<string>>(), true))
             .ReturnsAsync(accessibleContainers);
 
         var controller = CreateController("admin-oid", "SFT.Admin");
@@ -53,7 +53,7 @@ public class ContainersControllerTests
     }
 
     [Fact]
-    public async Task ListContainers_ThirdPartyUser_SeesOnlyTheirContainer()
+    public async Task ListContainers_UserWithGroups_SeesOnlyGroupContainers()
     {
         var allContainers = new List<string> { "sft-acme", "sft-globex" };
         var accessibleContainers = new List<string> { "sft-acme" };
@@ -63,10 +63,10 @@ public class ContainersControllerTests
             .ReturnsAsync(allContainers);
 
         _mockActivityService
-            .Setup(x => x.GetAccessibleContainersAsync("sp-acme", false, false))
+            .Setup(x => x.GetAccessibleContainersAsync("user-oid", It.IsAny<IReadOnlyList<string>>(), false))
             .ReturnsAsync(accessibleContainers);
 
-        var controller = CreateController("sp-acme");
+        var controller = CreateController("user-oid", groups: new[] { "group-acme-users" });
         var result = await controller.ListContainers();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -74,9 +74,9 @@ public class ContainersControllerTests
     }
 
     [Fact]
-    public async Task ListContainers_ThirdPartyUser_EmptyIntersection_ReturnsEmpty()
+    public async Task ListContainers_OrgUserWithoutGroups_SeesNoContainers()
     {
-        var allContainers = new List<string> { "sft-acme" };
+        var allContainers = new List<string> { "sft-acme", "sft-globex" };
         var accessibleContainers = new List<string>();
 
         _mockBlobStorage
@@ -84,10 +84,31 @@ public class ContainersControllerTests
             .ReturnsAsync(allContainers);
 
         _mockActivityService
-            .Setup(x => x.GetAccessibleContainersAsync("sp-unknown", false, false))
+            .Setup(x => x.GetAccessibleContainersAsync("org-user", It.IsAny<IReadOnlyList<string>>(), false))
             .ReturnsAsync(accessibleContainers);
 
-        var controller = CreateController("sp-unknown");
+        var controller = CreateController("org-user", "SFT.User");
+        var result = await controller.ListContainers();
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(okResult.Value);
+    }
+
+    [Fact]
+    public async Task ListContainers_ServicePrincipal_SeesOnlyTheirContainer()
+    {
+        var allContainers = new List<string> { "sft-acme", "sft-globex" };
+        var accessibleContainers = new List<string> { "sft-acme" };
+
+        _mockBlobStorage
+            .Setup(x => x.ListContainersAsync("sft-"))
+            .ReturnsAsync(allContainers);
+
+        _mockActivityService
+            .Setup(x => x.GetAccessibleContainersAsync("sp-acme", It.IsAny<IReadOnlyList<string>>(), false))
+            .ReturnsAsync(accessibleContainers);
+
+        var controller = CreateController("sp-acme");
         var result = await controller.ListContainers();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -103,11 +124,14 @@ public class ContainersControllerTests
         Assert.IsType<UnauthorizedResult>(result);
     }
 
-    private ContainersController CreateController(string userId, string? role = null)
+    private ContainersController CreateController(string userId, string? role = null, string[]? groups = null)
     {
         var claims = new List<Claim> { new("oid", userId) };
         if (role is not null)
             claims.Add(new Claim(ClaimTypes.Role, role));
+        if (groups is not null)
+            foreach (var g in groups)
+                claims.Add(new Claim("groups", g));
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var principal = new ClaimsPrincipal(identity);

@@ -73,8 +73,8 @@ public class ActivityService : IActivityService
         return records;
     }
 
-    public async Task<bool> UserHasContainerAccessAsync(
-        string userId, string containerName, bool isAdmin, bool isOrgUser)
+    public async Task<ContainerAccessResult> UserHasContainerAccessAsync(
+        string userId, IReadOnlyList<string> userGroups, string containerName, bool isAdmin)
     {
         var tableClient = _tableServiceClient.GetTableClient(RegistryTable);
         await tableClient.CreateIfNotExistsAsync();
@@ -82,20 +82,31 @@ public class ActivityService : IActivityService
         await foreach (var entity in tableClient.QueryAsync<ThirdParty>(
             filter: $"PartitionKey eq 'ThirdParty' and ContainerName eq '{ODataSanitizer.EscapeStringValue(containerName)}'"))
         {
-            if (entity.Status != "active") return false;
+            if (entity.Status != "active") return ContainerAccessResult.None;
 
-            // Admin and org users can access any active container
-            if (isAdmin || isOrgUser) return true;
+            // SFT.Admin role → full access to any active container
+            if (isAdmin) return ContainerAccessResult.Full;
 
-            // Third-party users: match ServicePrincipalObjectId
-            return entity.ServicePrincipalObjectId == userId;
+            // AdminGroupId match → full access (includes delete)
+            if (!string.IsNullOrEmpty(entity.AdminGroupId) && userGroups.Contains(entity.AdminGroupId))
+                return ContainerAccessResult.Full;
+
+            // UserGroupId match → read/upload/download only
+            if (!string.IsNullOrEmpty(entity.UserGroupId) && userGroups.Contains(entity.UserGroupId))
+                return ContainerAccessResult.ReadOnly;
+
+            // ServicePrincipalObjectId match → full access (M2M automation)
+            if (entity.ServicePrincipalObjectId == userId)
+                return ContainerAccessResult.Full;
+
+            return ContainerAccessResult.None;
         }
 
-        return false;
+        return ContainerAccessResult.None;
     }
 
     public async Task<IReadOnlyList<string>> GetAccessibleContainersAsync(
-        string userId, bool isAdmin, bool isOrgUser)
+        string userId, IReadOnlyList<string> userGroups, bool isAdmin)
     {
         var tableClient = _tableServiceClient.GetTableClient(RegistryTable);
         await tableClient.CreateIfNotExistsAsync();
@@ -106,7 +117,15 @@ public class ActivityService : IActivityService
         {
             if (entity.Status != "active") continue;
 
-            if (isAdmin || isOrgUser)
+            if (isAdmin)
+            {
+                containers.Add(entity.ContainerName);
+            }
+            else if (!string.IsNullOrEmpty(entity.AdminGroupId) && userGroups.Contains(entity.AdminGroupId))
+            {
+                containers.Add(entity.ContainerName);
+            }
+            else if (!string.IsNullOrEmpty(entity.UserGroupId) && userGroups.Contains(entity.UserGroupId))
             {
                 containers.Add(entity.ContainerName);
             }

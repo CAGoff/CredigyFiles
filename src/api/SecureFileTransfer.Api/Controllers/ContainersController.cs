@@ -38,9 +38,9 @@ public class ContainersController : ControllerBase
             return Unauthorized();
 
         var isAdmin = User.IsInRole("SFT.Admin");
-        var isOrgUser = User.IsInRole("SFT.User");
+        var userGroups = User.FindAll("groups").Select(c => c.Value).ToList();
 
-        var accessible = await _activityService.GetAccessibleContainersAsync(userId, isAdmin, isOrgUser);
+        var accessible = await _activityService.GetAccessibleContainersAsync(userId, userGroups, isAdmin);
         var accessibleSet = new HashSet<string>(accessible);
         var containers = allContainers.Where(c => accessibleSet.Contains(c)).ToList();
 

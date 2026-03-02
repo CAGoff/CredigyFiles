@@ -23,12 +23,22 @@ public class DevAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
         var userId = config["Authentication:DevUserId"] ?? "dev-user-id";
         var userName = config["Authentication:DevUserName"] ?? "dev@localhost";
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim("oid", userId),
-            new Claim("preferred_username", userName),
-            new Claim(ClaimTypes.Role, role),
+            new("oid", userId),
+            new("preferred_username", userName),
+            new(ClaimTypes.Role, role),
         };
+
+        // Add dev group claims (comma-separated list in config)
+        var devGroups = config["Authentication:DevGroups"];
+        if (!string.IsNullOrEmpty(devGroups))
+        {
+            foreach (var group in devGroups.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                claims.Add(new Claim("groups", group));
+            }
+        }
 
         var identity = new ClaimsIdentity(claims, "DevAuth");
         var principal = new ClaimsPrincipal(identity);

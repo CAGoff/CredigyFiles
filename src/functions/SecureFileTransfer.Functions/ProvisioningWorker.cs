@@ -8,8 +8,9 @@ using SecureFileTransfer.Functions.Services;
 namespace SecureFileTransfer.Functions;
 
 /// <summary>
-/// Processes provisioning/deprovisioning requests from the Storage Queue.
+/// Processes provisioning/deactivation requests from the Storage Queue.
 /// Creates containers, app registrations, and RBAC assignments.
+/// Deactivation revokes credentials but preserves containers and files.
 ///
 /// Uses user-assigned managed identity: id-sft-func-provision
 /// </summary>
@@ -52,9 +53,9 @@ public class ProvisioningWorker
             return;
         }
 
-        if (request.Action == "deprovision")
+        if (request.Action == "deactivate")
         {
-            await DeprovisionAsync(request);
+            await DeactivateAsync(request);
             return;
         }
 
@@ -126,9 +127,9 @@ public class ProvisioningWorker
         }
     }
 
-    private async Task DeprovisionAsync(ProvisioningRequest request)
+    private async Task DeactivateAsync(ProvisioningRequest request)
     {
-        _logger.LogInformation("Deprovisioning third party: {Container}", request.ContainerName);
+        _logger.LogInformation("Deactivating third party: {Container} (container preserved)", request.ContainerName);
 
         // Step 1: Delete app registration if exists
         if (!string.IsNullOrEmpty(request.AppRegistrationId))
@@ -137,23 +138,25 @@ public class ProvisioningWorker
             _logger.LogInformation("App registration {AppId} deleted", request.AppRegistrationId);
         }
 
-        // Step 2: Remove RBAC assignments
+        // Step 2: Remove RBAC assignments (revokes all access to the container)
         await _rbacService.RemoveAllRoleAssignmentsAsync(request.ContainerName);
 
-        // Step 3: Soft-delete the container (retained per policy)
-        var containerClient = _blobServiceClient.GetBlobContainerClient(request.ContainerName);
-        await containerClient.DeleteIfExistsAsync();
+        // Container is intentionally NOT deleted — files are preserved
 
-        // Step 4: Update registry status
+        // Step 3: Update registry status, clear credential fields
         var registryTable = _tableClient.GetTableClient("SftRegistry");
         try
         {
             var entity = await registryTable.GetEntityAsync<TableEntity>(
                 "ThirdParty", request.ThirdPartyId);
             entity.Value["Status"] = "inactive";
+            entity.Value["AppRegistrationId"] = null;
+            entity.Value["ServicePrincipalObjectId"] = null;
+            entity.Value["CertificateThumbprint"] = null;
             await registryTable.UpdateEntityAsync(
                 entity.Value, entity.Value.ETag, TableUpdateMode.Replace);
-            _logger.LogInformation("Third party {Id} status updated to inactive", request.ThirdPartyId);
+            _logger.LogInformation("Third party {Id} deactivated (container preserved: {Container})",
+                request.ThirdPartyId, request.ContainerName);
         }
         catch (Azure.RequestFailedException ex) when (ex.Status == 404)
         {
