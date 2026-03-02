@@ -136,18 +136,23 @@ jobs:
             --resource-group rg-credigyfiles-dev-eus \
             --name sft-credigyfiles-dev-spa \
             --set publicNetworkAccess=Enabled
-          echo "Waiting 30s for access changes to propagate..."
-          sleep 30
+          echo "Waiting 60s for access changes to propagate..."
+          sleep 60
 
-      # 1. Deploy API via Kudu zipdeploy
+      # 1. Deploy API via Kudu zipdeploy (with retry for SCM warmup)
       - name: Deploy API
         run: |
-          az webapp deploy \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-api \
-            --src-path artifacts/api-package/api-package.zip \
-            --type zip \
-            --clean true
+          for attempt in 1 2 3; do
+            echo "Deploy attempt $attempt..."
+            az webapp deploy \
+              --resource-group rg-credigyfiles-dev-eus \
+              --name sft-credigyfiles-dev-api \
+              --src-path artifacts/api-package/api-package.zip \
+              --type zip \
+              --clean true && break
+            echo "Attempt $attempt failed, waiting 30s before retry..."
+            sleep 30
+          done
 
       # 2. Deploy Functions (Flex Consumption)
       #    Workaround: Flex Consumption + VNet = Kudu can't reach blob storage.
@@ -182,12 +187,17 @@ jobs:
 
       - name: Deploy SPA
         run: |
-          az webapp deploy \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-spa \
-            --src-path web-package.zip \
-            --type zip \
-            --clean true
+          for attempt in 1 2 3; do
+            echo "Deploy attempt $attempt..."
+            az webapp deploy \
+              --resource-group rg-credigyfiles-dev-eus \
+              --name sft-credigyfiles-dev-spa \
+              --src-path web-package.zip \
+              --type zip \
+              --clean true && break
+            echo "Attempt $attempt failed, waiting 30s before retry..."
+            sleep 30
+          done
 
       # 4. Lock down public access
       - name: Disable public access
