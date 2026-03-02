@@ -125,6 +125,20 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # 0. Open public access for deployment
+      - name: Enable public access
+        run: |
+          az webapp update \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-api \
+            --set publicNetworkAccess=Enabled
+          az webapp update \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-spa \
+            --set publicNetworkAccess=Enabled
+          echo "Waiting 30s for access changes to propagate..."
+          sleep 30
+
       # 1. Deploy API via Kudu zipdeploy
       - name: Deploy API
         run: |
@@ -175,7 +189,20 @@ jobs:
             --type zip \
             --clean true
 
-      # 4. Re-sync Event Grid subscription
+      # 4. Lock down public access
+      - name: Disable public access
+        if: always()
+        run: |
+          az webapp update \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-api \
+            --set publicNetworkAccess=Disabled
+          az webapp update \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-spa \
+            --set publicNetworkAccess=Disabled
+
+      # 5. Re-sync Event Grid subscription
       - name: Update Event Grid subscription
         continue-on-error: true
         run: |
