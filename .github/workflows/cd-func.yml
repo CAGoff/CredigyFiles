@@ -1,0 +1,106 @@
+name: CD — Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/functions/**'
+      - 'SecureFileTransfer.sln'
+      - '.github/workflows/cd-func.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev-func
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-functions:
+    name: Build & Deploy Functions
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish
+        run: >
+          dotnet publish src/functions/SecureFileTransfer.Functions/SecureFileTransfer.Functions.csproj
+          --configuration Release
+          --output ./publish/functions
+
+      - name: Zip package
+        run: cd publish/functions && zip -r ../../functions-package.zip .
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Enable Functions storage public access
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevfunc \
+            --resource-group rg-credigyfiles-dev-eus \
+            --public-network-access Enabled \
+            --default-action Allow
+
+      - name: Remove Function App VNet integration
+        run: |
+          az functionapp vnet-integration remove \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-func || true
+          echo "Waiting 60s for VNet removal to propagate..."
+          sleep 60
+
+      - name: Deploy Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: sft-credigyfiles-dev-func
+          package: functions-package.zip
+
+      - name: Restore Function App VNet integration
+        if: always()
+        run: |
+          VNET_ID="/subscriptions/$(az account show --query id -o tsv)/resourceGroups/rg-network-dev-eus/providers/Microsoft.Network/virtualNetworks/vnet-webapp-dev-eus"
+          az functionapp vnet-integration add \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-func \
+            --vnet "$VNET_ID" \
+            --subnet sn-credigyfiles-func-outbound-dev-172_23_17_208-28
+
+      - name: Disable Functions storage public access
+        if: always()
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevfunc \
+            --resource-group rg-credigyfiles-dev-eus \
+            --default-action Deny \
+            --public-network-access Disabled
+
+      - name: Update Event Grid subscription
+        continue-on-error: true
+        run: |
+          FUNC_ID=$(az functionapp show \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-func \
+            --query id --output tsv)
+
+          az eventgrid system-topic event-subscription create \
+            --resource-group rg-credigyfiles-dev-eus \
+            --system-topic-name sft-credigyfiles-dev-evgt \
+            --name sft-credigyfiles-dev-evgs-notify \
+            --endpoint-type azurefunction \
+            --endpoint "$FUNC_ID/functions/NotificationTrigger" \
+            --included-event-types Microsoft.Storage.BlobCreated Microsoft.Storage.BlobDeleted \
+            --max-delivery-attempts 30 \
+            --event-ttl 1440

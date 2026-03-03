@@ -1,0 +1,61 @@
+name: CD — API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/api/**'
+      - 'SecureFileTransfer.sln'
+      - '.github/workflows/cd-api.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev-api
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-api:
+    name: Build & Deploy API
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish
+        run: >
+          dotnet publish src/api/SecureFileTransfer.Api/SecureFileTransfer.Api.csproj
+          --configuration Release
+          --output ./publish/api
+
+      - name: Zip package
+        run: cd publish/api && zip -r ../../api-package.zip .
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy API
+        run: |
+          for attempt in 1 2 3; do
+            echo "Deploy attempt $attempt..."
+            az webapp deploy \
+              --resource-group rg-credigyfiles-dev-eus \
+              --name sft-credigyfiles-dev-api \
+              --src-path api-package.zip \
+              --type zip \
+              --clean true && break
+            echo "Attempt $attempt failed, waiting 30s before retry..."
+            sleep 30
+          done
