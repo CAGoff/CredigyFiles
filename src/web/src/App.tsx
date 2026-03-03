@@ -3,9 +3,11 @@ import {
   AuthenticatedTemplate,
   UnauthenticatedTemplate,
   useMsal,
+  useIsAuthenticated,
 } from "@azure/msal-react";
 import { loginRequest } from "./services/auth";
 import { useBranding } from "./hooks/useBranding";
+import { useIsAdmin } from "./hooks/useUserRoles";
 import Dashboard from "./pages/Dashboard";
 import FileBrowser from "./pages/FileBrowser";
 import Upload from "./pages/Upload";
@@ -30,8 +32,27 @@ function AppRoutes() {
   );
 }
 
+function NavLinks() {
+  const isAdmin = useIsAdmin();
+
+  return (
+    <div className="nav-links">
+      <Link to="/">Dashboard</Link>
+      <Link to="/activity">Activity</Link>
+      {(DEV_AUTH || isAdmin) && (
+        <>
+          <Link to="/admin">Onboarding</Link>
+          <Link to="/admin/branding">Branding</Link>
+        </>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const { instance, accounts } = useMsal();
+  const msalAuthenticated = useIsAuthenticated();
+  const isAuthenticated = DEV_AUTH || msalAuthenticated;
   const { branding } = useBranding();
   const userName = DEV_AUTH ? "dev@localhost" : (accounts[0]?.name ?? accounts[0]?.username);
 
@@ -51,12 +72,7 @@ function App() {
             {branding.logoUrl && <img src={branding.logoUrl} alt={branding.appName} />}
             {branding.appName}
           </Link>
-          <div className="nav-links">
-            <Link to="/">Dashboard</Link>
-            <Link to="/activity">Activity</Link>
-            <Link to="/admin">Onboarding</Link>
-            <Link to="/admin/branding">Branding</Link>
-          </div>
+          {isAuthenticated && <NavLinks />}
         </div>
         <div className="nav-auth">
           {DEV_AUTH ? (
@@ -89,7 +105,8 @@ function App() {
             <UnauthenticatedTemplate>
               <div className="login-prompt">
                 <h1>{branding.appName}</h1>
-                <p>Please log in to access the file transfer portal.</p>
+                <p>Secure file transfer portal</p>
+                <p className="login-subtitle">Sign in to access your files and containers.</p>
                 <button className="btn btn-primary" onClick={handleLogin}>Login with Microsoft</button>
               </div>
             </UnauthenticatedTemplate>

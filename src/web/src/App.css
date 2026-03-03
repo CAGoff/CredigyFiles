@@ -106,7 +106,13 @@
 }
 
 .login-prompt p {
-  color: #71717a;
-  margin-bottom: 1.5rem;
+  color: #a1a1aa;
+  margin-bottom: 0.25rem;
   font-size: 1.1rem;
+}
+
+.login-prompt .login-subtitle {
+  color: #71717a;
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
 }
