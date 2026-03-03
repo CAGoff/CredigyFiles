@@ -10,14 +10,18 @@ import "./index.css";
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <BrandingProvider>
-      <MsalProvider instance={msalInstance}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </MsalProvider>
-    </BrandingProvider>
-  </StrictMode>
-);
+msalInstance.initialize().then(() => {
+  msalInstance.handleRedirectPromise().then(() => {
+    createRoot(document.getElementById("root")!).render(
+      <StrictMode>
+        <BrandingProvider>
+          <MsalProvider instance={msalInstance}>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </MsalProvider>
+        </BrandingProvider>
+      </StrictMode>
+    );
+  });
+});
