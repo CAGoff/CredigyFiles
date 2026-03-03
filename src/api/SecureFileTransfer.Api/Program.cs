@@ -54,6 +54,7 @@ else
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<IActivityService, ActivityService>();
 builder.Services.AddScoped<IOnboardingService, OnboardingService>();
+builder.Services.AddScoped<IBrandingService, BrandingService>();
 
 // Controllers + OpenAPI
 builder.Services.AddControllers();

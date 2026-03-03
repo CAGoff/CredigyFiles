@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { listContainers } from "../services/api";
+import { useBranding } from "../hooks/useBranding";
 import { Link } from "react-router-dom";
 
 export default function Dashboard() {
   const { instance } = useMsal();
+  const { branding } = useBranding();
   const [containers, setContainers] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1>Credigy Files</h1>
+      <h1>{branding.appName}</h1>
       <h2>Third-Party Containers</h2>
       {containers.length === 0 ? (
         <p>No containers available.</p>

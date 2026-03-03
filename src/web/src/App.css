@@ -16,6 +16,28 @@
   border-bottom: 1px solid #27272a;
 }
 
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #f4f4f5;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-right: 1.5rem;
+  white-space: nowrap;
+}
+
+.nav-brand:hover {
+  text-decoration: none;
+  color: #f4f4f5;
+}
+
+.nav-brand img {
+  height: 28px;
+  width: auto;
+}
+
 .nav-links {
   display: flex;
   gap: 1.5rem;
@@ -32,9 +54,9 @@
 }
 
 .nav-links a:hover {
-  color: #60a5fa;
+  color: var(--color-primary-light);
   text-decoration: none;
-  border-bottom-color: #60a5fa;
+  border-bottom-color: var(--color-primary-light);
 }
 
 .nav-auth {

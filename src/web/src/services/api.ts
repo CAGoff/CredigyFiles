@@ -155,3 +155,49 @@ export async function deactivateThirdParty(msal: IPublicClientApplication, id: s
   }, apiScopes.admin);
   return res.json();
 }
+
+// Branding operations
+export interface BrandingData {
+  appName: string;
+  primaryColor: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+}
+
+export async function getBranding(): Promise<BrandingData> {
+  // Public endpoint — no auth required
+  const response = await fetch(`${API_BASE}/branding`);
+  if (!response.ok) {
+    return { appName: "Credigy Files", primaryColor: "#2563eb" };
+  }
+  return response.json();
+}
+
+export async function updateBranding(msal: IPublicClientApplication, data: { appName: string; primaryColor: string }) {
+  const res = await apiFetch(msal, "/branding", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }, apiScopes.admin);
+  return res.json() as Promise<BrandingData>;
+}
+
+export async function uploadLogo(msal: IPublicClientApplication, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await apiFetch(msal, "/branding/logo", {
+    method: "POST",
+    body: formData,
+  }, apiScopes.admin);
+  return res.json() as Promise<BrandingData>;
+}
+
+export async function uploadFavicon(msal: IPublicClientApplication, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await apiFetch(msal, "/branding/favicon", {
+    method: "POST",
+    body: formData,
+  }, apiScopes.admin);
+  return res.json() as Promise<BrandingData>;
+}

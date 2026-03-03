@@ -1,4 +1,6 @@
 :root {
+  --color-primary: #2563eb;
+  --color-primary-light: #60a5fa;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -43,7 +45,7 @@ h2 {
 }
 
 a {
-  color: #60a5fa;
+  color: var(--color-primary-light);
   text-decoration: none;
 }
 
@@ -85,14 +87,15 @@ button:disabled {
 }
 
 .btn-primary {
-  background-color: #2563eb;
-  border-color: #2563eb;
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
   color: #fff;
 }
 
 .btn-primary:hover {
-  background-color: #1d4ed8;
-  border-color: #1d4ed8;
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  filter: brightness(0.85);
 }
 
 .btn-danger {
@@ -186,7 +189,7 @@ td.actions {
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
 }
 

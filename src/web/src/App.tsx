@@ -5,11 +5,13 @@ import {
   useMsal,
 } from "@azure/msal-react";
 import { loginRequest } from "./services/auth";
+import { useBranding } from "./hooks/useBranding";
 import Dashboard from "./pages/Dashboard";
 import FileBrowser from "./pages/FileBrowser";
 import Upload from "./pages/Upload";
 import ActivityLog from "./pages/ActivityLog";
 import AdminOnboarding from "./pages/AdminOnboarding";
+import AdminBranding from "./pages/AdminBranding";
 import "./App.css";
 
 const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === "true";
@@ -23,12 +25,14 @@ function AppRoutes() {
       <Route path="/activity" element={<ActivityLog />} />
       <Route path="/activity/:containerName" element={<ActivityLog />} />
       <Route path="/admin" element={<AdminOnboarding />} />
+      <Route path="/admin/branding" element={<AdminBranding />} />
     </Routes>
   );
 }
 
 function App() {
   const { instance, accounts } = useMsal();
+  const { branding } = useBranding();
   const userName = DEV_AUTH ? "dev@localhost" : (accounts[0]?.name ?? accounts[0]?.username);
 
   const handleLogin = () => {
@@ -42,10 +46,17 @@ function App() {
   return (
     <div className="app">
       <nav className="navbar">
-        <div className="nav-links">
-          <Link to="/">Dashboard</Link>
-          <Link to="/activity">Activity</Link>
-          <Link to="/admin">Admin</Link>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <Link to="/" className="nav-brand">
+            {branding.logoUrl && <img src={branding.logoUrl} alt={branding.appName} />}
+            {branding.appName}
+          </Link>
+          <div className="nav-links">
+            <Link to="/">Dashboard</Link>
+            <Link to="/activity">Activity</Link>
+            <Link to="/admin">Onboarding</Link>
+            <Link to="/admin/branding">Branding</Link>
+          </div>
         </div>
         <div className="nav-auth">
           {DEV_AUTH ? (
@@ -77,7 +88,7 @@ function App() {
             </AuthenticatedTemplate>
             <UnauthenticatedTemplate>
               <div className="login-prompt">
-                <h1>Credigy Files</h1>
+                <h1>{branding.appName}</h1>
                 <p>Please log in to access the file transfer portal.</p>
                 <button className="btn btn-primary" onClick={handleLogin}>Login with Microsoft</button>
               </div>
