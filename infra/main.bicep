@@ -33,15 +33,6 @@ param projectName string
 ])
 param environment string
 
-@description('Publisher email for the APIM instance.')
-param apimPublisherEmail string = 'admin@contoso.com'
-
-@description('Publisher name for the APIM instance.')
-param apimPublisherName string = 'Secure File Transfer'
-
-@description('APIM outbound IP address for App Service IP restriction. Leave empty to skip IP restrictions (useful for initial deployment before APIM exists).')
-param apimOutboundIp string = ''
-
 @description('Resource group containing the shared VNet.')
 param vnetResourceGroup string = 'rg-network-dev-eus'
 
@@ -53,9 +44,6 @@ param appServiceSubnetName string = 'sn-credigyfiles-outbound-dev-172_23_17_192-
 
 @description('Name of the existing subnet for Function App VNet integration (must be delegated to Microsoft.App/environments).')
 param functionAppSubnetName string = 'sn-credigyfiles-func-outbound-dev-172_23_17_208-28'
-
-@description('Name of the dedicated /27 subnet for APIM VNet integration (no delegation).')
-param apimSubnetName string = 'sn-credigyfiles-apim-inbound-dev-172_23_17_224-27'
 
 @description('Azure AD tenant ID for JWT validation. Update after creating Entra ID app registrations.')
 param aadTenantId string = '99fac1cb-b614-418f-a367-8002fcdf2b2f'
@@ -93,11 +81,6 @@ resource appServiceSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01'
 resource functionAppSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
   parent: vnet
   name: functionAppSubnetName
-}
-
-resource apimSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' existing = {
-  parent: vnet
-  name: apimSubnetName
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +167,6 @@ module appService 'modules/appservice.bicep' = {
     apiIdentityClientId: identity.outputs.apiIdentityClientId
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
-    apimOutboundIp: apimOutboundIp
     aadTenantId: aadTenantId
     aadApiClientId: aadApiClientId
     aadApiAudience: aadApiAudience
@@ -232,22 +214,7 @@ module rbac 'modules/rbac.bicep' = {
   }
 }
 
-// 10. APIM — Developer tier with External VNet (depends on: appService)
-module apim 'modules/apim.bicep' = {
-  name: 'apim'
-  params: {
-    location: location
-    projectName: projectName
-    environment: environment
-    publisherEmail: apimPublisherEmail
-    publisherName: apimPublisherName
-    backendWebAppHostname: appService.outputs.webAppHostname
-    apimSubnetId: apimSubnet.id
-    tags: tags
-  }
-}
-
-// 11. Event Grid (depends on: storageApp, functions)
+// 10. Event Grid (depends on: storageApp, functions)
 //     Conditional — skip on first deploy because the function code must be deployed first.
 //     Re-deploy with deployEventGrid=true after the CD pipeline deploys function code.
 module eventGrid 'modules/eventgrid.bicep' = if (deployEventGrid) {
@@ -303,9 +270,6 @@ output functionAppHostname string = functions.outputs.functionAppHostname
 
 @description('Default hostname of the SPA Web App.')
 output spaWebAppHostname string = spaAppService.outputs.webAppHostname
-
-@description('APIM gateway URL.')
-output apimGatewayUrl string = apim.outputs.apimGatewayUrl
 
 @description('Application Insights connection string.')
 output appInsightsConnectionString string = monitoring.outputs.appInsightsConnectionString

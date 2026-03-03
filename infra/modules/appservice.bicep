@@ -26,9 +26,6 @@ param appStorageBlobUri string
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
 
-@description('APIM outbound IP address for IP restriction. Use APIM gateway IP or service tag.')
-param apimOutboundIp string = ''
-
 @description('Resource ID of the subnet for VNet integration.')
 param subnetId string
 
@@ -88,22 +85,6 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
       alwaysOn: true
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
-      ipSecurityRestrictions: empty(apimOutboundIp) ? [] : [
-        {
-          name: 'AllowAPIM'
-          description: 'Allow traffic from APIM only.'
-          ipAddress: apimOutboundIp
-          action: 'Allow'
-          priority: 100
-        }
-        {
-          name: 'DenyAll'
-          description: 'Deny all other traffic.'
-          ipAddress: 'Any'
-          action: 'Deny'
-          priority: 200
-        }
-      ]
       appSettings: [
         {
           name: 'AZURE_CLIENT_ID'

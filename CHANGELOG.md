@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 ### Added
+- Group-based authorization: `ContainerAccessResult` model (`None`, `ReadOnly`, `Full`)
+- `UserGroupId`/`AdminGroupId` fields on `ThirdParty` entity, DTOs, and SPA forms
+- `ActivityService.UserHasContainerAccessAsync` checks Entra ID group claims against ThirdParty registry
+- `ContainerAccessExtensions.CheckContainerAccessAsync` extracts `groups` claim from JWT
+- Delete permission gating: `FilesController.DeleteFile` returns 403 for ReadOnly users
+- `DevAuthHandler` reads `Authentication:DevGroups` config for local group testing
+- Admin UI: group ID fields in `AdminOnboarding.tsx` create form + table display
+- 80 ThirdParty records populated from Entra ID groups via `scripts/populate-group-ids.py`
+- APIM UDR route table (`rt-apim-dev-eus`) for VNet peering compatibility
+- APIM subnet service endpoints: ServiceBus, AzureActiveDirectory (added to existing 4)
 - RBAC module (`modules/rbac.bicep`) for managed identity → storage role assignments
 - Initial project scaffold
 - Local development support: Azurite connection string + DevAuthHandler for JWT bypass
@@ -46,6 +56,11 @@
 - Bicep: MSAL auth placeholders use GUID format for Entra ID values
 
 ### Fixed
+- CI: ESLint crash — removed `ajv`/`minimatch` overrides from `package.json` (ajv v8 broke `@eslint/eslintrc`)
+- CD: API deploy 502 — increased propagation wait to 60s + 3-attempt retry with 30s backoff
+- CD: Functions deploy 403 — open/close `sftcredigyfilesdevfunc` public network access around deploy
+- API: 10+ minute startup — replaced `DefaultAzureCredential` with `ManagedIdentityCredential` in Azure
+- APIM: VNet injection failures — NSG monitor port 1866→1886, UDR for peered VNet routing, missing service endpoints
 - CI: cross-platform filename sanitization (backslash handling for Linux)
 - CD: `azure/functions-action` changed from `@v2` (nonexistent) to `@v1`
 - CD: Flex Consumption VNet workaround — auto-remove/restore VNet integration around Functions deploy

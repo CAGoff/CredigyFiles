@@ -112,11 +112,12 @@ resource apim 'Microsoft.ApiManagement/service@2023-09-01-preview' = {
   properties: {
     publisherEmail: publisherEmail
     publisherName: publisherName
-    virtualNetworkType: 'External'
-    virtualNetworkConfiguration: {
-      subnetResourceId: apimSubnet.id
-    }
-    publicIpAddressId: publicIp.id
+    // Deploy without VNet first, then add VNet integration after activation succeeds.
+    // virtualNetworkType: 'External'
+    // virtualNetworkConfiguration: {
+    //   subnetResourceId: apimSubnet.id
+    // }
+    // publicIpAddressId: publicIp.id
   }
 }
 

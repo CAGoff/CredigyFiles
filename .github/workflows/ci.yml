@@ -63,4 +63,4 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_BASE_URL: https://placeholder.example.com/sft/v1
+          VITE_API_BASE_URL: https://placeholder.example.com/v1
