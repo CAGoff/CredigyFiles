@@ -94,7 +94,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", async (BlobServiceClient blob, TableServiceClient table) =>
+{
+    // Warm up SDK connections on first health probe (Always On, deploy checks)
+    await blob.GetPropertiesAsync();
+    await table.GetPropertiesAsync();
+    return Results.Ok(new { status = "healthy" });
+});
 
 app.Run();
 
