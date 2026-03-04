@@ -46,7 +46,7 @@ jobs:
           VITE_AAD_API_CLIENT_ID: ${{ vars.VITE_AAD_API_CLIENT_ID }}
 
       - name: Zip package
-        run: cd dist && zip -r ../../web-package.zip .
+        run: cd dist && zip -r $GITHUB_WORKSPACE/web-package.zip .
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -62,7 +62,7 @@ jobs:
             az webapp deploy \
               --resource-group rg-credigyfiles-dev-eus \
               --name sft-credigyfiles-dev-spa \
-              --src-path ../../web-package.zip \
+              --src-path $GITHUB_WORKSPACE/web-package.zip \
               --type zip \
               --clean true && break
             echo "Attempt $attempt failed, waiting 30s before retry..."
