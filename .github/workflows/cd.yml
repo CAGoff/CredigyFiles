@@ -132,6 +132,8 @@ jobs:
             --resource-group rg-credigyfiles-dev-eus \
             --public-network-access Enabled \
             --default-action Allow
+          echo "Waiting 30s for network rule change to propagate..."
+          sleep 30
 
       - name: Upload API package
         run: |
