@@ -55,35 +55,20 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Enable public access
+      - name: Upload package to blob storage
         working-directory: .
         run: |
-          az webapp update \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-spa \
-            --set publicNetworkAccess=Enabled
-          echo "Waiting 30s for access change to propagate..."
-          sleep 30
+          az storage blob upload \
+            --account-name sftcredigyfilesdevapp \
+            --container-name deploy-spa \
+            --name package.zip \
+            --file $GITHUB_WORKSPACE/web-package.zip \
+            --overwrite \
+            --auth-mode login
 
-      - name: Deploy SPA
-        run: |
-          for attempt in 1 2 3; do
-            echo "Deploy attempt $attempt..."
-            az webapp deploy \
-              --resource-group rg-credigyfiles-dev-eus \
-              --name sft-credigyfiles-dev-spa \
-              --src-path $GITHUB_WORKSPACE/web-package.zip \
-              --type zip \
-              --clean true && break
-            echo "Attempt $attempt failed, waiting 30s before retry..."
-            sleep 30
-          done
-
-      - name: Disable public access
-        if: always()
+      - name: Restart App Service
         working-directory: .
         run: |
-          az webapp update \
+          az webapp restart \
             --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-spa \
-            --set publicNetworkAccess=Disabled
+            --name sft-credigyfiles-dev-spa

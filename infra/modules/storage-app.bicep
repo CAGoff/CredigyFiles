@@ -51,6 +51,26 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01
   }
 }
 
+// Deploy containers for Run From Package (API and SPA zip packages)
+var deployApiContainerName = 'deploy-api'
+var deploySpaContainerName = 'deploy-spa'
+
+resource deployApiContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobServices
+  name: deployApiContainerName
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+resource deploySpaContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobServices
+  name: deploySpaContainerName
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
 resource queueServices 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' = {
   parent: storageAccount
   name: 'default'
@@ -116,3 +136,9 @@ output blobEndpointUri string = storageAccount.properties.primaryEndpoints.blob
 
 @description('Queue endpoint URI for the app storage account.')
 output queueEndpointUri string = storageAccount.properties.primaryEndpoints.queue
+
+@description('Name of the deploy container for API packages (Run From Package).')
+output deployApiContainerName string = deployApiContainerName
+
+@description('Name of the deploy container for SPA packages (Run From Package).')
+output deploySpaContainerName string = deploySpaContainerName

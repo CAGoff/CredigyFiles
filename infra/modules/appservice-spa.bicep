@@ -17,6 +17,12 @@ param environment string
 @description('Resource ID of the existing App Service Plan (shared with the API).')
 param appServicePlanId string
 
+@description('Blob endpoint URI of the app storage account.')
+param appStorageBlobUri string
+
+@description('Name of the deploy container in app storage for Run From Package.')
+param deployContainerName string
+
 @description('Resource ID of the subnet for VNet integration.')
 param subnetId string
 
@@ -37,6 +43,9 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   location: location
   tags: tags
   kind: 'app,linux'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: appServicePlanId
     httpsOnly: true
@@ -48,6 +57,12 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
       alwaysOn: true
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
+      appSettings: [
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '${appStorageBlobUri}${deployContainerName}/package.zip'
+        }
+      ]
     }
   }
 }
@@ -60,3 +75,6 @@ output webAppHostname string = webApp.properties.defaultHostName
 
 @description('Name of the SPA Web App.')
 output webAppName string = webApp.name
+
+@description('Principal ID of the SPA system-assigned managed identity (for RBAC on deploy blob).')
+output systemPrincipalId string = webApp.identity.principalId

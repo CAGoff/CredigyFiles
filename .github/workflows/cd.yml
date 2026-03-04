@@ -123,43 +123,28 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # 0. Open public access for deployment
-      - name: Enable public access
+      # 1. Deploy API — upload package to blob storage (Run From Package)
+      - name: Upload API package
         run: |
-          az webapp update \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-api \
-            --set publicNetworkAccess=Enabled
-          az webapp update \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-spa \
-            --set publicNetworkAccess=Enabled
+          az storage blob upload \
+            --account-name sftcredigyfilesdevapp \
+            --container-name deploy-api \
+            --name package.zip \
+            --file artifacts/api-package/api-package.zip \
+            --overwrite \
+            --auth-mode login
+
+      # 2. Deploy Functions (Flex Consumption)
+      #    Workaround: Flex Consumption + VNet = Kudu can't reach blob storage.
+      #    Temporarily remove VNet integration, deploy, then re-add it.
+      - name: Enable Functions storage public access
+        run: |
           az storage account update \
             --name sftcredigyfilesdevfunc \
             --resource-group rg-credigyfiles-dev-eus \
             --public-network-access Enabled \
             --default-action Allow
-          echo "Waiting 60s for access changes to propagate..."
-          sleep 60
 
-      # 1. Deploy API via Kudu zipdeploy (with retry for SCM warmup)
-      - name: Deploy API
-        run: |
-          for attempt in 1 2 3; do
-            echo "Deploy attempt $attempt..."
-            az webapp deploy \
-              --resource-group rg-credigyfiles-dev-eus \
-              --name sft-credigyfiles-dev-api \
-              --src-path artifacts/api-package/api-package.zip \
-              --type zip \
-              --clean true && break
-            echo "Attempt $attempt failed, waiting 30s before retry..."
-            sleep 30
-          done
-
-      # 2. Deploy Functions (Flex Consumption)
-      #    Workaround: Flex Consumption + VNet = Kudu can't reach blob storage.
-      #    Temporarily remove VNet integration, deploy, then re-add it.
       - name: Remove Function App VNet integration
         run: |
           az functionapp vnet-integration remove \
@@ -184,41 +169,38 @@ jobs:
             --vnet "$VNET_ID" \
             --subnet sn-credigyfiles-func-outbound-dev-172_23_17_208-28
 
-      # 3. Deploy SPA to App Service
-      - name: Zip SPA
-        run: cd artifacts/web-dist && zip -r ../../web-package.zip .
-
-      - name: Deploy SPA
-        run: |
-          for attempt in 1 2 3; do
-            echo "Deploy attempt $attempt..."
-            az webapp deploy \
-              --resource-group rg-credigyfiles-dev-eus \
-              --name sft-credigyfiles-dev-spa \
-              --src-path web-package.zip \
-              --type zip \
-              --clean true && break
-            echo "Attempt $attempt failed, waiting 30s before retry..."
-            sleep 30
-          done
-
-      # 4. Lock down public access
-      - name: Disable public access
+      - name: Disable Functions storage public access
         if: always()
         run: |
-          az webapp update \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-api \
-            --set publicNetworkAccess=Disabled
-          az webapp update \
-            --resource-group rg-credigyfiles-dev-eus \
-            --name sft-credigyfiles-dev-spa \
-            --set publicNetworkAccess=Disabled
           az storage account update \
             --name sftcredigyfilesdevfunc \
             --resource-group rg-credigyfiles-dev-eus \
             --default-action Deny \
             --public-network-access Disabled
+
+      # 3. Deploy SPA — upload package to blob storage (Run From Package)
+      - name: Zip SPA
+        run: cd artifacts/web-dist && zip -r ../../web-package.zip .
+
+      - name: Upload SPA package
+        run: |
+          az storage blob upload \
+            --account-name sftcredigyfilesdevapp \
+            --container-name deploy-spa \
+            --name package.zip \
+            --file web-package.zip \
+            --overwrite \
+            --auth-mode login
+
+      # 4. Restart API and SPA to pick up new packages
+      - name: Restart App Services
+        run: |
+          az webapp restart \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-api
+          az webapp restart \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-spa
 
       # 5. Re-sync Event Grid subscription
       - name: Update Event Grid subscription

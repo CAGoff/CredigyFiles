@@ -54,6 +54,9 @@ param aadApiClientId string = 'fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 @description('Azure AD audience for the API (must match the identifier URI on the app registration).')
 param aadApiAudience string = 'api://fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 
+@description('Object (principal) ID of the CD service principal for RBAC on deploy storage. Leave empty to skip.')
+param cdServicePrincipalId string = ''
+
 @description('Deploy Event Grid subscription. Set to false for initial deployment (function code must be deployed first).')
 param deployEventGrid bool = false
 
@@ -132,7 +135,7 @@ module storageFunc 'modules/storage-func.bicep' = {
 }
 
 // 5. SPA Web App (shares App Service Plan with the API)
-//    Depends on: appService (needs plan ID)
+//    Depends on: appService (needs plan ID), storageApp (Run From Package)
 module spaAppService 'modules/appservice-spa.bicep' = {
   name: 'spaAppService'
   params: {
@@ -140,6 +143,8 @@ module spaAppService 'modules/appservice-spa.bicep' = {
     projectName: projectName
     environment: environment
     appServicePlanId: appService.outputs.appServicePlanId
+    appStorageBlobUri: storageApp.outputs.blobEndpointUri
+    deployContainerName: storageApp.outputs.deploySpaContainerName
     subnetId: appServiceSubnet.id
     publicNetworkAccess: 'Enabled'
     tags: tags
@@ -166,6 +171,7 @@ module appService 'modules/appservice.bicep' = {
     apiIdentityId: identity.outputs.apiIdentityId
     apiIdentityClientId: identity.outputs.apiIdentityClientId
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
+    deployContainerName: storageApp.outputs.deployApiContainerName
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     aadTenantId: aadTenantId
     aadApiClientId: aadApiClientId
@@ -201,7 +207,7 @@ module functions 'modules/functions.bicep' = {
 }
 
 // 9. RBAC — role assignments for managed identities on storage accounts
-//    (depends on: identity, storageApp, storageFunc, functions)
+//    (depends on: identity, storageApp, storageFunc, functions, spaAppService)
 module rbac 'modules/rbac.bicep' = {
   name: 'rbac'
   params: {
@@ -209,6 +215,8 @@ module rbac 'modules/rbac.bicep' = {
     notifyPrincipalId: identity.outputs.notifyIdentityPrincipalId
     provisionPrincipalId: identity.outputs.provisionIdentityPrincipalId
     functionAppSystemPrincipalId: functions.outputs.functionAppSystemPrincipalId
+    spaSystemPrincipalId: spaAppService.outputs.systemPrincipalId
+    cdServicePrincipalId: cdServicePrincipalId
     appStorageAccountName: storageApp.outputs.storageAccountName
     funcStorageAccountName: storageFunc.outputs.storageAccountName
   }

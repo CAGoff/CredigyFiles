@@ -38,6 +38,9 @@ param aadApiClientId string = '00000000-0000-0000-0000-000000000000'
 @description('Azure AD audience for the API (typically the API app registration client ID or URI).')
 param aadApiAudience string = '00000000-0000-0000-0000-000000000000'
 
+@description('Name of the deploy container in app storage for Run From Package.')
+param deployContainerName string
+
 @description('Whether to allow public network access. Set to Disabled after private endpoint is configured.')
 @allowed([
   'Enabled'
@@ -113,6 +116,14 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsightsConnectionString
+        }
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '${appStorageBlobUri}${deployContainerName}/package.zip'
+        }
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE_BLOB_MI_RESOURCE_ID'
+          value: apiIdentityId
         }
       ]
     }

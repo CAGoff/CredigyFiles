@@ -17,6 +17,12 @@ param provisionPrincipalId string
 @description('Principal ID of the Function App system-assigned identity (for runtime storage).')
 param functionAppSystemPrincipalId string
 
+@description('Principal ID of the SPA system-assigned identity (for Run From Package blob read).')
+param spaSystemPrincipalId string
+
+@description('Principal ID of the CD service principal (for uploading deploy packages to blob storage). Leave empty to skip.')
+param cdServicePrincipalId string = ''
+
 @description('Name of the app storage account (business data).')
 param appStorageAccountName string
 
@@ -25,6 +31,7 @@ param funcStorageAccountName string
 
 // Well-known built-in role definition IDs
 var storageBlobDataContributor = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+var storageBlobDataReader = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
 var storageTableDataContributor = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 var storageQueueDataContributor = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 var storageTableDataReader = '76199698-9eea-4c19-bc75-cec21354c6b6'
@@ -169,6 +176,35 @@ resource funcSystemMgmt 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageAccountContributor)
     principalId: functionAppSystemPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SPA system identity → app storage (blob read for Run From Package)
+// ---------------------------------------------------------------------------
+
+resource spaBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(appStorage.id, spaSystemPrincipalId, storageBlobDataReader)
+  scope: appStorage
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataReader)
+    principalId: spaSystemPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CD service principal → app storage (blob write for deploy package upload)
+//   Conditional — skip when cdServicePrincipalId is not provided.
+// ---------------------------------------------------------------------------
+
+resource cdBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(cdServicePrincipalId)) {
+  name: guid(appStorage.id, cdServicePrincipalId, storageBlobDataContributor)
+  scope: appStorage
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributor)
+    principalId: cdServicePrincipalId
     principalType: 'ServicePrincipal'
   }
 }
