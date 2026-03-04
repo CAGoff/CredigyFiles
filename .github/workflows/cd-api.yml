@@ -46,6 +46,14 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Enable app storage public access
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevapp \
+            --resource-group rg-credigyfiles-dev-eus \
+            --public-network-access Enabled \
+            --default-action Allow
+
       - name: Upload package to blob storage
         run: |
           az storage blob upload \
@@ -55,6 +63,15 @@ jobs:
             --file api-package.zip \
             --overwrite \
             --auth-mode login
+
+      - name: Disable app storage public access
+        if: always()
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevapp \
+            --resource-group rg-credigyfiles-dev-eus \
+            --default-action Deny \
+            --public-network-access Disabled
 
       - name: Restart App Service
         run: |

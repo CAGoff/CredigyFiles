@@ -123,7 +123,16 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # 1. Deploy API — upload package to blob storage (Run From Package)
+      # 1. Deploy API & SPA — upload packages to blob storage (Run From Package)
+      #    Temporarily enable public access on app storage for upload.
+      - name: Enable app storage public access
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevapp \
+            --resource-group rg-credigyfiles-dev-eus \
+            --public-network-access Enabled \
+            --default-action Allow
+
       - name: Upload API package
         run: |
           az storage blob upload \
@@ -191,6 +200,15 @@ jobs:
             --file web-package.zip \
             --overwrite \
             --auth-mode login
+
+      - name: Disable app storage public access
+        if: always()
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevapp \
+            --resource-group rg-credigyfiles-dev-eus \
+            --default-action Deny \
+            --public-network-access Disabled
 
       # 4. Restart API and SPA to pick up new packages
       - name: Restart App Services

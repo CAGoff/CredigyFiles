@@ -55,6 +55,15 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Enable app storage public access
+        working-directory: .
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevapp \
+            --resource-group rg-credigyfiles-dev-eus \
+            --public-network-access Enabled \
+            --default-action Allow
+
       - name: Upload package to blob storage
         working-directory: .
         run: |
@@ -65,6 +74,16 @@ jobs:
             --file $GITHUB_WORKSPACE/web-package.zip \
             --overwrite \
             --auth-mode login
+
+      - name: Disable app storage public access
+        if: always()
+        working-directory: .
+        run: |
+          az storage account update \
+            --name sftcredigyfilesdevapp \
+            --resource-group rg-credigyfiles-dev-eus \
+            --default-action Deny \
+            --public-network-access Disabled
 
       - name: Restart App Service
         working-directory: .
