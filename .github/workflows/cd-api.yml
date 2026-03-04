@@ -46,6 +46,15 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Enable public access
+        run: |
+          az webapp update \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-api \
+            --set publicNetworkAccess=Enabled
+          echo "Waiting 30s for access change to propagate..."
+          sleep 30
+
       - name: Deploy API
         run: |
           for attempt in 1 2 3; do
@@ -59,3 +68,11 @@ jobs:
             echo "Attempt $attempt failed, waiting 30s before retry..."
             sleep 30
           done
+
+      - name: Disable public access
+        if: always()
+        run: |
+          az webapp update \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-api \
+            --set publicNetworkAccess=Disabled
