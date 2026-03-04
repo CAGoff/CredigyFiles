@@ -14,30 +14,38 @@ permissions:
 jobs:
   # ── Parallel build jobs ──────────────────────────────────────────────
   build-api:
-    name: Build API
+    name: Build API Image
     runs-on: ubuntu-latest
+    environment: dev
+    env:
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      IMAGE_NAME: sft-api
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
         with:
-          dotnet-version: "9.0.x"
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Publish
-        run: >
-          dotnet publish src/api/SecureFileTransfer.Api/SecureFileTransfer.Api.csproj
-          --configuration Release
-          --output ./publish/api
+      - name: Login to ACR
+        run: az acr login --name $ACR_NAME
 
-      - name: Zip package
-        run: cd publish/api && zip -r ../../api-package.zip .
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          ACR_SERVER="${ACR_NAME}.azurecr.io"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-package
-          path: api-package.zip
+          docker build \
+            -f src/api/Dockerfile \
+            -t "${ACR_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" \
+            -t "${ACR_SERVER}/${IMAGE_NAME}:latest" \
+            .
+
+          docker push "${ACR_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${ACR_SERVER}/${IMAGE_NAME}:latest"
 
   build-functions:
     name: Build Functions
@@ -66,38 +74,42 @@ jobs:
           path: functions-package.zip
 
   build-web:
-    name: Build Web
+    name: Build SPA Image
     runs-on: ubuntu-latest
     environment: dev
-    defaults:
-      run:
-        working-directory: src/web
+    env:
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      IMAGE_NAME: sft-spa
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
         with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: src/web/package-lock.json
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Login to ACR
+        run: az acr login --name $ACR_NAME
 
-      - name: Build
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_AAD_CLIENT_ID: ${{ vars.VITE_AAD_CLIENT_ID }}
-          VITE_AAD_TENANT_ID: ${{ vars.VITE_AAD_TENANT_ID }}
-          VITE_AAD_API_CLIENT_ID: ${{ vars.VITE_AAD_API_CLIENT_ID }}
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          ACR_SERVER="${ACR_NAME}.azurecr.io"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-dist
-          path: src/web/dist
+          docker build \
+            -f src/web/Dockerfile \
+            --build-arg VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }} \
+            --build-arg VITE_AAD_CLIENT_ID=${{ vars.VITE_AAD_CLIENT_ID }} \
+            --build-arg VITE_AAD_TENANT_ID=${{ vars.VITE_AAD_TENANT_ID }} \
+            --build-arg VITE_AAD_API_CLIENT_ID=${{ vars.VITE_AAD_API_CLIENT_ID }} \
+            -t "${ACR_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" \
+            -t "${ACR_SERVER}/${IMAGE_NAME}:latest" \
+            src/web
+
+          docker push "${ACR_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${ACR_SERVER}/${IMAGE_NAME}:latest"
 
   # ── Sequential deploy job ────────────────────────────────────────────
   deploy-dev:
@@ -105,6 +117,8 @@ jobs:
     needs: [build-api, build-functions, build-web]
     runs-on: ubuntu-latest
     environment: dev
+    env:
+      ACR_NAME: ${{ vars.ACR_NAME }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -123,27 +137,16 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # 1. Deploy API & SPA — upload packages to blob storage (Run From Package)
-      #    Temporarily enable public access on app storage for upload.
-      - name: Enable app storage public access
+      # 1. Deploy API container
+      - name: Deploy API container
         run: |
-          az storage account update \
-            --name sftcredigyfilesdevapp \
-            --resource-group rg-credigyfiles-dev-eus \
-            --public-network-access Enabled \
-            --default-action Allow
-          echo "Waiting 30s for network rule change to propagate..."
-          sleep 30
+          IMAGE_TAG="${{ github.sha }}"
+          ACR_SERVER="${ACR_NAME}.azurecr.io"
 
-      - name: Upload API package
-        run: |
-          az storage blob upload \
-            --account-name sftcredigyfilesdevapp \
-            --container-name deploy-api \
-            --name package.zip \
-            --file artifacts/api-package/api-package.zip \
-            --overwrite \
-            --auth-mode login
+          az webapp config container set \
+            --resource-group rg-credigyfiles-dev-eus \
+            --name sft-credigyfiles-dev-api \
+            --container-image-name "${ACR_SERVER}/sft-api:${IMAGE_TAG}"
 
       # 2. Deploy Functions (Flex Consumption)
       #    Workaround: Flex Consumption + VNet = Kudu can't reach blob storage.
@@ -189,30 +192,18 @@ jobs:
             --default-action Deny \
             --public-network-access Disabled
 
-      # 3. Deploy SPA — upload package to blob storage (Run From Package)
-      - name: Zip SPA
-        run: cd artifacts/web-dist && zip -r ../../web-package.zip .
-
-      - name: Upload SPA package
+      # 3. Deploy SPA container
+      - name: Deploy SPA container
         run: |
-          az storage blob upload \
-            --account-name sftcredigyfilesdevapp \
-            --container-name deploy-spa \
-            --name package.zip \
-            --file web-package.zip \
-            --overwrite \
-            --auth-mode login
+          IMAGE_TAG="${{ github.sha }}"
+          ACR_SERVER="${ACR_NAME}.azurecr.io"
 
-      - name: Disable app storage public access
-        if: always()
-        run: |
-          az storage account update \
-            --name sftcredigyfilesdevapp \
+          az webapp config container set \
             --resource-group rg-credigyfiles-dev-eus \
-            --default-action Deny \
-            --public-network-access Disabled
+            --name sft-credigyfiles-dev-spa \
+            --container-image-name "${ACR_SERVER}/sft-spa:${IMAGE_TAG}"
 
-      # 4. Restart API and SPA to pick up new packages
+      # 4. Restart API and SPA to pick up new containers
       - name: Restart App Services
         run: |
           az webapp restart \

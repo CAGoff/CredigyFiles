@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+.git/
+.github/
+infra/
+docs/
+**/TestResults/
+**/*.user
+**/*.suo
+**/.vs/
+**/.env*.local

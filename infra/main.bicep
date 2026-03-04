@@ -54,7 +54,7 @@ param aadApiClientId string = 'fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 @description('Azure AD audience for the API (must match the identifier URI on the app registration).')
 param aadApiAudience string = 'api://fa1dcccc-ce0d-463c-a28b-08085248ef2e'
 
-@description('Object (principal) ID of the CD service principal for RBAC on deploy storage. Leave empty to skip.')
+@description('Object (principal) ID of the CD service principal for RBAC on ACR. Leave empty to skip.')
 param cdServicePrincipalId string = ''
 
 @description('Deploy Event Grid subscription. Set to false for initial deployment (function code must be deployed first).')
@@ -123,6 +123,17 @@ module storageApp 'modules/storage-app.bicep' = {
   }
 }
 
+// 3b. Container Registry (no dependencies)
+module acr 'modules/acr.bicep' = {
+  name: 'acr'
+  params: {
+    location: location
+    projectName: projectName
+    environment: environment
+    tags: tags
+  }
+}
+
 // 4. Functions Storage Account (no dependencies)
 module storageFunc 'modules/storage-func.bicep' = {
   name: 'storageFunc'
@@ -135,7 +146,7 @@ module storageFunc 'modules/storage-func.bicep' = {
 }
 
 // 5. SPA Web App (shares App Service Plan with the API)
-//    Depends on: appService (needs plan ID), storageApp (Run From Package)
+//    Depends on: appService (needs plan ID), acr (container image source)
 module spaAppService 'modules/appservice-spa.bicep' = {
   name: 'spaAppService'
   params: {
@@ -143,8 +154,7 @@ module spaAppService 'modules/appservice-spa.bicep' = {
     projectName: projectName
     environment: environment
     appServicePlanId: appService.outputs.appServicePlanId
-    appStorageBlobUri: storageApp.outputs.blobEndpointUri
-    deployContainerName: storageApp.outputs.deploySpaContainerName
+    acrLoginServer: acr.outputs.loginServer
     subnetId: appServiceSubnet.id
     publicNetworkAccess: 'Enabled'
     tags: tags
@@ -161,7 +171,7 @@ module communication 'modules/communication.bicep' = {
   }
 }
 
-// 7. App Service (depends on: identity, storageApp, monitoring)
+// 7. App Service (depends on: identity, storageApp, monitoring, acr)
 module appService 'modules/appservice.bicep' = {
   name: 'appService'
   params: {
@@ -171,7 +181,7 @@ module appService 'modules/appservice.bicep' = {
     apiIdentityId: identity.outputs.apiIdentityId
     apiIdentityClientId: identity.outputs.apiIdentityClientId
     appStorageBlobUri: storageApp.outputs.blobEndpointUri
-    deployContainerName: storageApp.outputs.deployApiContainerName
+    acrLoginServer: acr.outputs.loginServer
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     aadTenantId: aadTenantId
     aadApiClientId: aadApiClientId
@@ -206,8 +216,8 @@ module functions 'modules/functions.bicep' = {
   }
 }
 
-// 9. RBAC — role assignments for managed identities on storage accounts
-//    (depends on: identity, storageApp, storageFunc, functions, spaAppService)
+// 9. RBAC — role assignments for managed identities on storage accounts and ACR
+//    (depends on: identity, storageApp, storageFunc, functions, spaAppService, acr)
 module rbac 'modules/rbac.bicep' = {
   name: 'rbac'
   params: {
@@ -219,6 +229,7 @@ module rbac 'modules/rbac.bicep' = {
     cdServicePrincipalId: cdServicePrincipalId
     appStorageAccountName: storageApp.outputs.storageAccountName
     funcStorageAccountName: storageFunc.outputs.storageAccountName
+    acrId: acr.outputs.acrId
   }
 }
 

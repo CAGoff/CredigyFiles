@@ -3,6 +3,7 @@
 // Description: App Service Plan (B1 Linux) and Web App for the SFT API.
 //              VNet integrated, with user-assigned managed identity and
 //              app settings for storage and Azure AD authentication.
+//              Pulls container images from ACR using managed identity.
 // =============================================================================
 
 @description('Azure region for the App Service resources.')
@@ -20,7 +21,7 @@ param apiIdentityId string
 @description('Client ID of the API user-assigned managed identity.')
 param apiIdentityClientId string
 
-@description('Blob endpoint URI of the app storage account.')
+@description('Blob endpoint URI of the app storage account (business data).')
 param appStorageBlobUri string
 
 @description('Application Insights connection string.')
@@ -28,6 +29,15 @@ param appInsightsConnectionString string
 
 @description('Resource ID of the subnet for VNet integration.')
 param subnetId string
+
+@description('ACR login server (e.g. myacr.azurecr.io).')
+param acrLoginServer string
+
+@description('Container image name in ACR.')
+param acrImageName string = 'sft-api'
+
+@description('Container image tag.')
+param acrImageTag string = 'latest'
 
 @description('Azure AD tenant ID for JWT validation.')
 param aadTenantId string = '00000000-0000-0000-0000-000000000000'
@@ -37,9 +47,6 @@ param aadApiClientId string = '00000000-0000-0000-0000-000000000000'
 
 @description('Azure AD audience for the API (typically the API app registration client ID or URI).')
 param aadApiAudience string = '00000000-0000-0000-0000-000000000000'
-
-@description('Name of the deploy container in app storage for Run From Package.')
-param deployContainerName string
 
 @description('Whether to allow public network access. Set to Disabled after private endpoint is configured.')
 @allowed([
@@ -71,7 +78,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: '${baseName}-api'
   location: location
   tags: tags
-  kind: 'app,linux'
+  kind: 'app,linux,container'
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
@@ -84,7 +91,9 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
     publicNetworkAccess: publicNetworkAccess
     virtualNetworkSubnetId: subnetId
     siteConfig: {
-      linuxFxVersion: 'DOTNETCORE|9.0'
+      linuxFxVersion: 'DOCKER|${acrLoginServer}/${acrImageName}:${acrImageTag}'
+      acrUseManagedIdentityCreds: true
+      acrUserManagedIdentityID: apiIdentityClientId
       alwaysOn: true
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
@@ -118,12 +127,20 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: appInsightsConnectionString
         }
         {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '${appStorageBlobUri}${deployContainerName}/package.zip'
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://${acrLoginServer}'
         }
         {
-          name: 'WEBSITE_RUN_FROM_PACKAGE_BLOB_MI_RESOURCE_ID'
-          value: apiIdentityId
+          name: 'WEBSITES_PORT'
+          value: '8080'
+        }
+        {
+          name: 'DOCKER_ENABLE_CI'
+          value: 'false'
+        }
+        {
+          name: 'WEBSITE_PULL_IMAGE_OVER_VNET'
+          value: 'true'
         }
       ]
     }

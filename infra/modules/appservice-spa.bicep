@@ -1,8 +1,8 @@
 // =============================================================================
 // Module: appservice-spa.bicep
 // Description: Web App for the React SPA front-end, hosted on the shared
-//              App Service Plan (B1 Linux). Uses pm2 to serve static files
-//              with SPA client-side routing support.
+//              App Service Plan (B1 Linux). Pulls nginx container from ACR
+//              using system-assigned managed identity.
 // =============================================================================
 
 @description('Azure region for the Web App.')
@@ -17,11 +17,14 @@ param environment string
 @description('Resource ID of the existing App Service Plan (shared with the API).')
 param appServicePlanId string
 
-@description('Blob endpoint URI of the app storage account.')
-param appStorageBlobUri string
+@description('ACR login server (e.g. myacr.azurecr.io).')
+param acrLoginServer string
 
-@description('Name of the deploy container in app storage for Run From Package.')
-param deployContainerName string
+@description('Container image name in ACR.')
+param acrImageName string = 'sft-spa'
+
+@description('Container image tag.')
+param acrImageTag string = 'latest'
 
 @description('Resource ID of the subnet for VNet integration.')
 param subnetId string
@@ -42,7 +45,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: '${baseName}-spa'
   location: location
   tags: tags
-  kind: 'app,linux'
+  kind: 'app,linux,container'
   identity: {
     type: 'SystemAssigned'
   }
@@ -52,15 +55,27 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
     publicNetworkAccess: publicNetworkAccess
     virtualNetworkSubnetId: subnetId
     siteConfig: {
-      linuxFxVersion: 'NODE|20-lts'
-      appCommandLine: 'pm2 serve /home/site/wwwroot --no-daemon --spa'
+      linuxFxVersion: 'DOCKER|${acrLoginServer}/${acrImageName}:${acrImageTag}'
+      acrUseManagedIdentityCreds: true
       alwaysOn: true
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
       appSettings: [
         {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '${appStorageBlobUri}${deployContainerName}/package.zip'
+          name: 'DOCKER_REGISTRY_SERVER_URL'
+          value: 'https://${acrLoginServer}'
+        }
+        {
+          name: 'WEBSITES_PORT'
+          value: '80'
+        }
+        {
+          name: 'DOCKER_ENABLE_CI'
+          value: 'false'
+        }
+        {
+          name: 'WEBSITE_PULL_IMAGE_OVER_VNET'
+          value: 'true'
         }
       ]
     }
@@ -76,5 +91,5 @@ output webAppHostname string = webApp.properties.defaultHostName
 @description('Name of the SPA Web App.')
 output webAppName string = webApp.name
 
-@description('Principal ID of the SPA system-assigned managed identity (for RBAC on deploy blob).')
+@description('Principal ID of the SPA system-assigned managed identity (for AcrPull RBAC).')
 output systemPrincipalId string = webApp.identity.principalId

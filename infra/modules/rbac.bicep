@@ -1,8 +1,8 @@
 // =============================================================================
 // Module: rbac.bicep
 // Description: RBAC role assignments granting managed identities access to
-//              storage accounts. Covers API, notification, provisioning, and
-//              Function App system identities.
+//              storage accounts and ACR. Covers API, notification, provisioning,
+//              Function App system identities, and ACR pull/push.
 // =============================================================================
 
 @description('Principal ID of the API managed identity.')
@@ -17,10 +17,10 @@ param provisionPrincipalId string
 @description('Principal ID of the Function App system-assigned identity (for runtime storage).')
 param functionAppSystemPrincipalId string
 
-@description('Principal ID of the SPA system-assigned identity (for Run From Package blob read).')
+@description('Principal ID of the SPA system-assigned identity (for AcrPull).')
 param spaSystemPrincipalId string
 
-@description('Principal ID of the CD service principal (for uploading deploy packages to blob storage). Leave empty to skip.')
+@description('Principal ID of the CD service principal (for AcrPush). Leave empty to skip.')
 param cdServicePrincipalId string = ''
 
 @description('Name of the app storage account (business data).')
@@ -29,17 +29,21 @@ param appStorageAccountName string
 @description('Name of the functions runtime storage account.')
 param funcStorageAccountName string
 
+@description('Resource ID of the Container Registry.')
+param acrId string
+
 // Well-known built-in role definition IDs
 var storageBlobDataContributor = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-var storageBlobDataReader = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
 var storageTableDataContributor = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 var storageQueueDataContributor = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 var storageTableDataReader = '76199698-9eea-4c19-bc75-cec21354c6b6'
 var storageBlobDataOwner = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 var storageAccountContributor = '17d1049b-9a84-46fb-8f53-869881c3d3ab'
+var acrPull = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+var acrPush = '8311e382-0749-4cb8-b61a-304f252e45ec'
 
 // ---------------------------------------------------------------------------
-// References to existing storage accounts (deployed by other modules)
+// References to existing resources (deployed by other modules)
 // ---------------------------------------------------------------------------
 
 resource appStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
@@ -48,6 +52,10 @@ resource appStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
 
 resource funcStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: funcStorageAccountName
+}
+
+resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: last(split(acrId, '/'))
 }
 
 // ---------------------------------------------------------------------------
@@ -181,29 +189,39 @@ resource funcSystemMgmt 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 
 // ---------------------------------------------------------------------------
-// SPA system identity → app storage (blob read for Run From Package)
+// ACR pull — API (user-assigned MI) and SPA (system-assigned MI)
 // ---------------------------------------------------------------------------
 
-resource spaBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(appStorage.id, spaSystemPrincipalId, storageBlobDataReader)
-  scope: appStorage
+resource apiAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, apiPrincipalId, acrPull)
+  scope: acr
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataReader)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPull)
+    principalId: apiPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource spaAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, spaSystemPrincipalId, acrPull)
+  scope: acr
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPull)
     principalId: spaSystemPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // ---------------------------------------------------------------------------
-// CD service principal → app storage (blob write for deploy package upload)
+// CD service principal → ACR (push images during deploy)
 //   Conditional — skip when cdServicePrincipalId is not provided.
 // ---------------------------------------------------------------------------
 
-resource cdBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(cdServicePrincipalId)) {
-  name: guid(appStorage.id, cdServicePrincipalId, storageBlobDataContributor)
-  scope: appStorage
+resource cdAcrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(cdServicePrincipalId)) {
+  name: guid(acr.id, cdServicePrincipalId, acrPush)
+  scope: acr
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributor)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPush)
     principalId: cdServicePrincipalId
     principalType: 'ServicePrincipal'
   }

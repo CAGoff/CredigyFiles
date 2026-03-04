@@ -21,32 +21,11 @@ jobs:
     name: Build & Deploy SPA
     runs-on: ubuntu-latest
     environment: dev
-    defaults:
-      run:
-        working-directory: src/web
+    env:
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      IMAGE_NAME: sft-spa
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: src/web/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_AAD_CLIENT_ID: ${{ vars.VITE_AAD_CLIENT_ID }}
-          VITE_AAD_TENANT_ID: ${{ vars.VITE_AAD_TENANT_ID }}
-          VITE_AAD_API_CLIENT_ID: ${{ vars.VITE_AAD_API_CLIENT_ID }}
-
-      - name: Zip package
-        run: cd dist && zip -r $GITHUB_WORKSPACE/web-package.zip .
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -55,41 +34,37 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Enable app storage public access
-        working-directory: .
+      - name: Login to ACR
+        run: az acr login --name $ACR_NAME
+
+      - name: Build and push Docker image
         run: |
-          az storage account update \
-            --name sftcredigyfilesdevapp \
+          IMAGE_TAG="${{ github.sha }}"
+          ACR_SERVER="${ACR_NAME}.azurecr.io"
+
+          docker build \
+            -f src/web/Dockerfile \
+            --build-arg VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }} \
+            --build-arg VITE_AAD_CLIENT_ID=${{ vars.VITE_AAD_CLIENT_ID }} \
+            --build-arg VITE_AAD_TENANT_ID=${{ vars.VITE_AAD_TENANT_ID }} \
+            --build-arg VITE_AAD_API_CLIENT_ID=${{ vars.VITE_AAD_API_CLIENT_ID }} \
+            -t "${ACR_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}" \
+            -t "${ACR_SERVER}/${IMAGE_NAME}:latest" \
+            src/web
+
+          docker push "${ACR_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${ACR_SERVER}/${IMAGE_NAME}:latest"
+
+      - name: Deploy to App Service
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          ACR_SERVER="${ACR_NAME}.azurecr.io"
+
+          az webapp config container set \
             --resource-group rg-credigyfiles-dev-eus \
-            --public-network-access Enabled \
-            --default-action Allow
-          echo "Waiting 30s for network rule change to propagate..."
-          sleep 30
+            --name sft-credigyfiles-dev-spa \
+            --container-image-name "${ACR_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
 
-      - name: Upload package to blob storage
-        working-directory: .
-        run: |
-          az storage blob upload \
-            --account-name sftcredigyfilesdevapp \
-            --container-name deploy-spa \
-            --name package.zip \
-            --file $GITHUB_WORKSPACE/web-package.zip \
-            --overwrite \
-            --auth-mode login
-
-      - name: Disable app storage public access
-        if: always()
-        working-directory: .
-        run: |
-          az storage account update \
-            --name sftcredigyfilesdevapp \
-            --resource-group rg-credigyfiles-dev-eus \
-            --default-action Deny \
-            --public-network-access Disabled
-
-      - name: Restart App Service
-        working-directory: .
-        run: |
           az webapp restart \
             --resource-group rg-credigyfiles-dev-eus \
             --name sft-credigyfiles-dev-spa
